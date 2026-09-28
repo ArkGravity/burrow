@@ -1,0 +1,16 @@
+.git
+.codex
+.serena
+.env
+.env.*
+!.env.example
+**/node_modules
+**/dist
+**/test-results
+**/playwright-report
+**/*.db
+**/*.db-*
+**/*.sqlite*
+bin
+data
+docs

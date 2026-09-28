@@ -1,0 +1,249 @@
+import { expect, test } from "@playwright/test";
+import { spawn } from "node:child_process";
+import { resolve } from "node:path";
+
+test("administrator provisions access and ordinary users see only their portal", async ({
+  page,
+  browser,
+}) => {
+  const errors: string[] = [];
+  page.on("pageerror", (e) => errors.push(e.message));
+  await page.goto("/login");
+  await page.getByLabel("Username", { exact: true }).fill("admin");
+  await page
+    .getByLabel("Password", { exact: true })
+    .fill("Initial-admin-password-2026");
+  await page.getByRole("button", { name: "Sign in", exact: true }).click();
+  await expect(page).toHaveURL(/change-password/);
+  await page
+    .getByLabel("Current password", { exact: true })
+    .fill("Initial-admin-password-2026");
+  await page
+    .getByLabel("New password", { exact: true })
+    .fill("Changed-admin-password-2026");
+  await page
+    .getByLabel("Confirm password", { exact: true })
+    .fill("Changed-admin-password-2026");
+  await page
+    .getByRole("button", { name: "Change password", exact: true })
+    .click();
+  await expect(
+    page.getByRole("heading", { name: "Your work starts here." }),
+  ).not.toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Your workspace, connected." }),
+  ).toBeVisible();
+  await page.getByRole("link", { name: "Users", exact: true }).click();
+  await page.getByRole("button", { name: "Create", exact: true }).click();
+  await page.getByLabel("Username", { exact: true }).fill("alice");
+  await page.getByLabel("Name", { exact: true }).fill("Alice");
+  await page.getByLabel("Email", { exact: true }).fill("alice@example.test");
+  await page
+    .getByLabel("Password", { exact: true })
+    .fill("Alice-initial-password-2026");
+  await page.getByRole("button", { name: "Save changes", exact: true }).click();
+  await expect(page.getByText("alice@example.test")).toBeVisible();
+  await page.getByRole("link", { name: "Applications", exact: true }).click();
+  await page.getByRole("button", { name: "Create", exact: true }).click();
+  await page.getByLabel("Name", { exact: true }).fill("Engineering");
+  await page
+    .getByLabel("Application login URL", { exact: true })
+    .fill("http://localhost:19001/login");
+  await page
+    .getByLabel("Redirect URIs", { exact: true })
+    .fill("http://localhost:19001/callback");
+  await page.getByRole("button", { name: "Save changes", exact: true }).click();
+  await expect(page.getByText("Save this secret now")).toBeVisible();
+  await page.getByRole("button", { name: "Close", exact: true }).last().click();
+  await page.getByRole("link", { name: "Roles", exact: true }).click();
+  await page.getByRole("button", { name: "Create", exact: true }).click();
+  await page.getByLabel("Name", { exact: true }).fill("Engineers");
+  await page
+    .getByRole("combobox", { name: "Permissions", exact: true })
+    .click();
+  await page
+    .locator(".ant-select-item-option")
+    .filter({ hasText: /app:.*:login/ })
+    .click();
+  await page.getByRole("button", { name: "Save changes", exact: true }).click();
+  await expect(page.getByText("Engineers", { exact: true })).toBeVisible();
+  await page.getByRole("link", { name: "Groups", exact: true }).click();
+  await page.getByRole("button", { name: "Create", exact: true }).click();
+  await page.getByLabel("Name", { exact: true }).fill("Engineering team");
+  await page.getByLabel("Members", { exact: true }).click();
+  await page
+    .locator(".ant-select-item-option")
+    .filter({ hasText: "Alice" })
+    .click();
+  await page.getByLabel("Name", { exact: true }).click();
+  await page.getByRole("combobox", { name: "Roles", exact: true }).click();
+  await page
+    .locator(".ant-select-item-option")
+    .filter({ hasText: "Engineers" })
+    .click();
+  await page.getByRole("button", { name: "Save changes", exact: true }).click();
+  await expect(
+    page.getByText("Engineering team", { exact: true }),
+  ).toBeVisible();
+  await page.screenshot({
+    path: "test-results/admin-workspace.png",
+    fullPage: true,
+  });
+  const context = await browser.newContext();
+  const ordinary = await context.newPage();
+  await ordinary.goto("/login");
+  await ordinary.getByLabel("Username", { exact: true }).fill("alice");
+  await ordinary
+    .getByLabel("Password", { exact: true })
+    .fill("Alice-initial-password-2026");
+  await ordinary.getByRole("button", { name: "Sign in", exact: true }).click();
+  await expect(ordinary).toHaveURL(/change-password/);
+  await ordinary
+    .getByLabel("Current password", { exact: true })
+    .fill("Alice-initial-password-2026");
+  await ordinary
+    .getByLabel("New password", { exact: true })
+    .fill("Alice-changed-password-2026");
+  await ordinary
+    .getByLabel("Confirm password", { exact: true })
+    .fill("Alice-changed-password-2026");
+  await ordinary
+    .getByRole("button", { name: "Change password", exact: true })
+    .click();
+  await expect(
+    ordinary.getByRole("heading", { name: "Engineering", exact: true }),
+  ).toBeVisible();
+  await expect(
+    ordinary.getByRole("link", { name: "Users", exact: true }),
+  ).toHaveCount(0);
+  expect((await ordinary.request.get("/api/v1/users")).status()).toBe(403);
+  await ordinary.getByRole("combobox", { name: "Language" }).click();
+  await ordinary.getByText("中文", { exact: true }).click();
+  await expect(
+    ordinary.getByRole("heading", { name: "我的应用" }),
+  ).toBeVisible();
+  await ordinary.reload();
+  await expect(
+    ordinary.getByRole("heading", { name: "我的应用" }),
+  ).toBeVisible();
+  await ordinary.getByRole("combobox", { name: "外观" }).click();
+  await ordinary.getByText("深色", { exact: true }).click();
+  await expect(ordinary.locator("html")).toHaveAttribute("data-theme", "dark");
+  await ordinary.screenshot({
+    path: "test-results/portal-dark-zh.png",
+    fullPage: true,
+  });
+  await ordinary.getByRole("link", { name: "退出登录" }).click();
+  await ordinary.getByRole("button", { name: "退出登录", exact: true }).click();
+  await expect(ordinary).toHaveURL(/login/);
+  expect(errors).toEqual([]);
+  await context.close();
+});
+
+test("independent Web and SPA OIDC clients share SSO and complete RP logout", async ({
+  page,
+  request,
+}) => {
+  test.setTimeout(60000);
+  await page.goto("/login");
+  await page.getByLabel("Username", { exact: true }).fill("admin");
+  await page
+    .getByLabel("Password", { exact: true })
+    .fill("Changed-admin-password-2026");
+  await page.getByRole("button", { name: "Sign in", exact: true }).click();
+  await expect(
+    page.getByRole("heading", { name: "Your workspace, connected." }),
+  ).toBeVisible();
+  const csrf = (await (await page.request.get("/api/v1/auth/csrf")).json())
+    .token;
+  const provision = async (name: string, type: string, port: number) => {
+    const response = await page.request.post("/api/v1/applications", {
+      headers: { "X-CSRF-Token": csrf },
+      data: {
+        name,
+        clientType: type,
+        enabled: true,
+        localEnabled: true,
+        loginUrl: `http://localhost:${port}/login`,
+        redirectUris: [`http://localhost:${port}/callback`],
+        postLogoutRedirectUris: [`http://localhost:${port}/`],
+        origins: type === "spa" ? [`http://localhost:${port}`] : [],
+      },
+    });
+    expect(response.status()).toBe(201);
+    return response.json();
+  };
+  const web = await provision("Web interop", "web", 19001);
+  const spa = await provision("SPA interop", "spa", 19002);
+  const issuer = process.env.BURROW_E2E_URL || "http://localhost:18080";
+  const webChild = spawn(process.env.BURROW_E2E_WEB_BINARY!, [], {
+    env: {
+      ...process.env,
+      OIDC_ISSUER: issuer,
+      OIDC_CLIENT_ID: web.clientId,
+      OIDC_CLIENT_SECRET: web.clientSecret,
+    },
+    stdio: "ignore",
+  });
+  const spaDir = resolve("../examples/spa-client");
+  const spaChild = spawn(
+    process.execPath,
+    [
+      resolve(spaDir, "node_modules/vite/bin/vite.js"),
+      "--host",
+      "127.0.0.1",
+      "--port",
+      "19002",
+      "--strictPort",
+    ],
+    {
+      cwd: spaDir,
+      env: {
+        ...process.env,
+        VITE_OIDC_ISSUER: issuer,
+        VITE_OIDC_CLIENT_ID: spa.clientId,
+      },
+      stdio: "ignore",
+    },
+  );
+  try {
+    await expect
+      .poll(async () => {
+        try {
+          return (await request.get("http://localhost:19001/")).status();
+        } catch {
+          return 0;
+        }
+      })
+      .toBe(200);
+    await expect
+      .poll(async () => {
+        try {
+          return (await request.get("http://localhost:19002/")).status();
+        } catch {
+          return 0;
+        }
+      })
+      .toBe(200);
+    await page.goto("http://localhost:19001/login");
+    await expect(page).toHaveURL(/localhost:19001\/callback/);
+    await expect(page.locator("body")).toContainText(
+      "OIDC code + PKCE verified with coreos/go-oidc",
+    );
+    await page.goto("http://localhost:19002/");
+    await page.getByRole("button", { name: "Sign in with Burrow" }).click();
+    await expect(page.locator("#result")).toContainText(
+      '"preferred_username": "admin"',
+    );
+    await page.getByRole("button", { name: "Sign out", exact: true }).click();
+    await expect(
+      page.getByRole("heading", { name: "Sign out of Burrow?" }),
+    ).toBeVisible();
+    await page.getByRole("button", { name: "Sign out", exact: true }).click();
+    await expect(page).toHaveURL(/localhost:19002/);
+    expect((await page.request.get(issuer + "/api/v1/me")).status()).toBe(401);
+  } finally {
+    webChild.kill();
+    spaChild.kill();
+  }
+});

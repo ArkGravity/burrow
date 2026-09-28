@@ -1,0 +1,69 @@
+name: burrow
+
+x-app: &app
+  image: ${BURROW_IMAGE:-burrow:local}
+  build:
+    context: .
+  environment: &environment
+    BURROW_ENV: ${BURROW_ENV:-dev}
+    BURROW_LISTEN_ADDR: :8080
+    BURROW_ISSUER: ${BURROW_ISSUER:-http://localhost:8080}
+    BURROW_DB_DRIVER: postgres
+    BURROW_DB_DSN: ${BURROW_DB_DSN:?Set BURROW_DB_DSN in .env}
+    BURROW_MASTER_KEY: ${BURROW_MASTER_KEY:?Set BURROW_MASTER_KEY in .env}
+    BURROW_SESSION_TTL: ${BURROW_SESSION_TTL:-8h}
+    BURROW_TOKEN_TTL: ${BURROW_TOKEN_TTL:-5m}
+    BURROW_AUTH_CODE_TTL: ${BURROW_AUTH_CODE_TTL:-60s}
+    BURROW_LOGIN_TTL: ${BURROW_LOGIN_TTL:-10m}
+    BURROW_EVENT_RETENTION: ${BURROW_EVENT_RETENTION:-2160h}
+    BURROW_TRUSTED_PROXIES: ${BURROW_TRUSTED_PROXIES:-}
+    BURROW_PROVIDER_ALLOWED_CIDRS: ${BURROW_PROVIDER_ALLOWED_CIDRS:-}
+  read_only: true
+  tmpfs:
+    - /tmp
+  security_opt:
+    - no-new-privileges:true
+  cap_drop:
+    - ALL
+
+services:
+  app:
+    <<: *app
+    command: [serve]
+    restart: unless-stopped
+    ports:
+      - "${BURROW_BIND_ADDR:-127.0.0.1}:${BURROW_PORT:-8080}:8080"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test: [CMD, burrow, healthcheck]
+      interval: 20s
+      timeout: 5s
+      start_period: 20s
+      retries: 3
+  migrate:
+    <<: *app
+    command: [migrate]
+    restart: "no"
+    healthcheck:
+      disable: true
+  postgres:
+    image: postgres:17-alpine
+    profiles: [local-db]
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-burrow}
+      POSTGRES_USER: ${POSTGRES_USER:-burrow}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test:
+        [CMD-SHELL, 'pg_isready -U "$${POSTGRES_USER}" -d "$${POSTGRES_DB}"']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+volumes:
+  postgres-data:

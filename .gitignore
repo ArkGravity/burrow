@@ -1,0 +1,17 @@
+.codex/
+.serena/
+*.tsbuildinfo
+.env
+.env.*
+!.env.example
+node_modules/
+dist/
+bin/
+data/
+*.db
+*.db-*
+*.sqlite*
+coverage/
+test-results/
+playwright-report/
+.DS_Store
