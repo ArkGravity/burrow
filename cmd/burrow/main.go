@@ -25,8 +25,30 @@ func main() {
 }
 func run() error {
 	command := "serve"
-	if len(os.Args) > 1 {
-		command = os.Args[1]
+	args := os.Args[1:]
+	if len(args) > 0 && !strings.HasPrefix(args[0], "-") {
+		command, args = args[0], args[1:]
+	}
+	switch command {
+	case "serve", "migrate", "admin-init", "keys-rotate", "healthcheck":
+	default:
+		return fmt.Errorf("unknown command %q", command)
+	}
+	fs := flag.NewFlagSet(command, flag.ContinueOnError)
+	configPath := fs.String("config", "", "configuration file (default: configs/config.yaml or embedded defaults)")
+	var username string
+	if command == "admin-init" {
+		fs.Bool("password-stdin", true, "read password from stdin")
+		fs.StringVar(&username, "username", "admin", "initial administrator username")
+	}
+	if err := fs.Parse(args); err != nil {
+		if err == flag.ErrHelp {
+			return nil
+		}
+		return err
+	}
+	if fs.NArg() != 0 {
+		return fmt.Errorf("unexpected arguments: %s", strings.Join(fs.Args(), " "))
 	}
 	if command == "healthcheck" {
 		url := os.Getenv("BURROW_HEALTHCHECK_URL")
@@ -44,7 +66,7 @@ func run() error {
 		}
 		return nil
 	}
-	c, e := burrow.LoadConfig()
+	c, e := burrow.LoadConfigFile(*configPath)
 	if e != nil {
 		return e
 	}
@@ -81,18 +103,12 @@ func run() error {
 		}
 		return nil
 	case "admin-init":
-		fs := flag.NewFlagSet("admin-init", flag.ContinueOnError)
-		fs.Bool("password-stdin", true, "read password from stdin")
-		username := fs.String("username", "admin", "initial administrator username")
-		if e = fs.Parse(os.Args[2:]); e != nil {
-			return e
-		}
 		fmt.Fprintln(os.Stderr, "Read initial administrator password from stdin (minimum 12 characters):")
 		scanner := bufio.NewScanner(os.Stdin)
 		if !scanner.Scan() {
 			return fmt.Errorf("password required on stdin")
 		}
-		return store.InitAdmin(strings.TrimSpace(*username), scanner.Text())
+		return store.InitAdmin(strings.TrimSpace(username), scanner.Text())
 	case "keys-rotate":
 		if e = store.Health(context.Background()); e != nil {
 			return e

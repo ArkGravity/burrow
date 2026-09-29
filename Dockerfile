@@ -10,6 +10,7 @@ WORKDIR /src
 COPY go.mod go.sum ./
 RUN go mod download
 COPY cmd/ cmd/
+COPY configs/ configs/
 COPY internal/ internal/
 COPY web/*.go web/
 COPY --from=frontend /src/web/dist web/dist

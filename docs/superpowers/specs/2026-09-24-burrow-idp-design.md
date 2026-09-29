@@ -177,11 +177,11 @@ Access Token 第一版用于 Burrow UserInfo，不把它作为任意业务 API �
 ```text
 README.md
 Dockerfile
-docker-compose.yaml
+docker-compose.yml
 .env.example
 ```
 
-部署只使用项目根目录的 `docker-compose.yaml`，不创建部署子目录或环境覆盖 YAML。以根目录 `.env.example` 说明变量，实际凭据写入未跟踪的 `.env`。如需区分 dev/prod，使用各自未跟踪的环境文件与独立 Compose project，复用同一个 YAML。
+部署只使用项目根目录的 `docker-compose.yml`，不创建部署子目录或环境覆盖 YAML。以根目录 `.env.example` 说明变量，实际凭据写入未跟踪的 `.env`。如需区分 dev/prod，使用各自未跟踪的环境文件与独立 Compose project，复用同一个 YAML。
 
 ### 9.1 本地开发与 README
 
@@ -208,7 +208,7 @@ migrate 有界重试等待数据库，应用只在迁移成功后运行；初始
 7. Discovery 声明与实际能力一致，JWKS/签名轮换可验证；用独立 OIDC 客户端联调，不能只靠同一库自测。采用适用的 OIDC 一致性测试，不宣称正式认证。
 8. PostgreSQL、SQLite 均覆盖迁移、唯一约束、授权码原子消费与主要用户/权限流程。
 9. 前端覆盖登录、用户/组/角色授权、APP/Provider 配置、中英文与三种主题；普通用户不显示管理能力。
-10. 根目录 docker-compose.yaml 通过配置检查、本地构建/固定镜像启动、内置/外部数据库接入、迁移和重启冒烟验证；环境隔离通过环境变量和 Compose project 实现。
+10. 根目录 docker-compose.yml 通过配置检查、本地构建/固定镜像启动、内置/外部数据库接入、迁移和重启冒烟验证；环境隔离通过环境变量和 Compose project 实现。
 11. 重启后会话与密钥按持久化设计工作；日志和部署样例不存在真实凭据。
 
 ## 11. 后续交付顺序
@@ -229,6 +229,6 @@ migrate 有界重试等待数据库，应用只在迁移成功后运行；初始
 
 - 已统一为单组织、固定 RBAC、无自动注册、无 Refresh Token、无跨 APP 同步退出。
 - 已区分上游 RP 与下游 OP、认证状态与 APP 授权、客户端密钥哈希与上游密钥加密。
-- 已统一为根目录 docker-compose.yaml 单文件部署，无部署子目录或环境覆盖 YAML。
+- 已统一为根目录 docker-compose.yml 单文件部署，无部署子目录或环境覆盖 YAML。
 - 已说明单副本、迁移、密钥持久化、权限撤销后的令牌/会话边界。
 - TTL、事件保留期及运维细节是本次补全的初始设计默认值，随本文整体审阅；不作为已运行验证的事实。

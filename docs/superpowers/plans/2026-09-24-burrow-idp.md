@@ -68,7 +68,7 @@
 | `web/`                  | React 源码、静态资源嵌入入口、构建与浏览器测试            |
 | `tests/integration/`    | HTTP、数据库与协议边界测试                                |
 | `examples/`             | 独立客户端实现的 Web/SPA 联调样例                         |
-| `docker-compose.yaml`   | 根目录唯一 Compose 配置，支持本地构建和固定镜像           |
+| `docker-compose.yml`   | 根目录唯一 Compose 配置，支持本地构建和固定镜像           |
 | `.env.example`          | 配置变量说明；真实环境文件不提交                          |
 
 模块以内聚的小文件组织，API handler 只做输入输出与业务调用。不要将所有模型放在一个巨型 models.go，也不要让整个业务层使用 op.AuthRequest。
@@ -102,7 +102,7 @@ REST 错误格式固定为 `{ "error": { "code": "FORBIDDEN", "requestId": "…"
 - [ ] 创建最小可构建前端入口与开发代理，先不写业务页面；执行 `rtk proxy bun run --cwd web typecheck`、`rtk proxy bun run --cwd web build`，预期退出 0。
 - [ ] 将锁文件和依赖选择写入版本记录，提交 `chore: establish burrow project and configuration`。
 
-配置断言契约：输入 `ENV=prod, ISSUER=http://localhost:8080` 必须被拒绝；输入 `ENV=dev, DB_DRIVER=sqlite` 不要求网络数据库。主密钥为 32 字节随机数据的 Base64 编码，验证解码长度，不使用固定开发默认密钥。
+配置断言契约：输入 `ENV=prod, ISSUER=http://localhost:8080` 必须被拒绝；输入 `ENV=dev, DB_DRIVER=sqlite` 不要求网络数据库。主密钥为 32 字节数据的 Base64 编码，验证解码长度。按 2026-09-29 的调整，默认文件提供公开开发示例密钥，prod 必须替换为独立随机密钥。
 
 ## Task 2：数据库与可重复迁移
 
@@ -282,17 +282,17 @@ REST 错误格式固定为 `{ "error": { "code": "FORBIDDEN", "requestId": "…"
 
 **依赖：** 13、14。
 
-**创建：** `web/embed.go`、`internal/server/static.go`、`Dockerfile`、`.dockerignore`、`docker-compose.yaml`、`.env.example`；**修改：** `cmd/burrow/main.go`、`.gitignore`。
+**创建：** `web/embed.go`、`internal/server/static.go`、`Dockerfile`、`.dockerignore`、`docker-compose.yml`、`.env.example`；**修改：** `cmd/burrow/main.go`、`.gitignore`。
 
 - [ ] 使用前端构建阶段→Go 编译阶段→非 root 运行阶段；前端构建在 Go embed 前完成。开发采用 build tag 分离未构建的 dist，避免 `go test` 依赖不存在的产物。
 - [ ] Go 静态托管支持 SPA fallback，但 `/api`、`/oidc`、`/.well-known` 未知路径不返回 HTML；hash 静态资源长期缓存、index 不长期缓存。
 - [ ] 应用镜像内提供 healthcheck 子命令，不依赖运行镜像包含 shell/curl；编译 SQLite 驱动时明确 CGO/运行库需求，并实测镜像不能只在宿主运行。
-- [ ] 根目录 `docker-compose.yaml` 定义 app、migrate 和 profile 为 local-db 的 PostgreSQL；不让 app 强制 depends_on 一个可选数据库服务。migrate 有界重试等待数据库，app 依赖 migrate 成功。
+- [ ] 根目录 `docker-compose.yml` 定义 app、migrate 和 profile 为 local-db 的 PostgreSQL；不让 app 强制 depends_on 一个可选数据库服务。migrate 有界重试等待数据库，app 依赖 migrate 成功。
 - [ ] app 和 migrate 使用相同 `BURROW_IMAGE`，共享配置与构建定义。本地显式执行 `docker compose build` 后使用 `--pull never --no-build` 启动；生产先拉取固定镜像，再使用 `--no-build` 启动，不能意外构建生产镜像。实际执行命令在 README 列出。
 - [ ] 提供单个根目录 `.env.example`，说明配置、镜像、数据库与主密钥；真实 `.env`、`.env.dev`、`.env.prod` 均忽略，显式保留 `.env.example`。构建上下文也排除真实凭据和数据库文件。
 - [ ] 默认读取 `.env`；需要 dev/prod 隔离时，以 `--env-file` 和 `--project-name` 复用同一 YAML，不创建环境覆盖 YAML、固定 container_name 或跨 project 共用数据卷。数据库默认不映射宿主机端口。
 - [ ] 实现迁移锁和幂等检查，应用启动仅检查 schema；升级迁移兼容旧版本，镜像回滚不自动回滚数据库。初始化管理员作为独立命令，不能每次启动重新创建。
-- [ ] 在准备实际本地配置后运行 `rtk proxy docker compose -f docker-compose.yaml config --quiet`，再使用隔离环境文件检查 `--env-file`、`--project-name` 和 local-db profile 组合，预期均退出 0；不输出包含秘密的渲染配置。
+- [ ] 在准备实际本地配置后运行 `rtk proxy docker compose -f docker-compose.yml config --quiet`，再使用隔离环境文件检查 `--env-file`、`--project-name` 和 local-db profile 组合，预期均退出 0；不输出包含秘密的渲染配置。
 - [ ] 在隔离 project 验证本地构建/固定镜像、内置/外部 PostgreSQL、迁移失败阻止应用启动、初始化、登录、重启后会话/JWKS 保持；不得连接用户生产数据库。
 - [ ] 提交 `feat: package burrow with root compose configuration`。
 
@@ -327,7 +327,7 @@ REST 错误格式固定为 `{ "error": { "code": "FORBIDDEN", "requestId": "…"
 | 本地 README、根目录单文件 Compose、单副本 | 15、16         |
 | 日志、备份、探针、验收                    | 11、14、16     |
 
-自检结论：任务覆盖规格；部署使用根目录单个 docker-compose.yaml，没有部署子目录、环境覆盖 YAML 或新增运行时服务。文件路径、配置前缀、默认 TTL 和端点在任务间一致。关键协议适配以锁定版本真实接口为依据，任务 8 先记录调用顺序，任务 9 再实现原子消费，避免推测库的事务行为。未执行实现或测试，当前没有测试通过的声明。
+自检结论：任务覆盖规格；部署使用根目录单个 docker-compose.yml，没有部署子目录、环境覆盖 YAML 或新增运行时服务。文件路径、配置前缀、默认 TTL 和端点在任务间一致。关键协议适配以锁定版本真实接口为依据，任务 8 先记录调用顺序，任务 9 再实现原子消费，避免推测库的事务行为。未执行实现或测试，当前没有测试通过的声明。
 
 ## 执行交接
 

@@ -8,6 +8,7 @@
 | Chi / GORM                     | 5.3.2 / 1.31.2     |
 | GORM PostgreSQL / SQLite       | 1.6.3 / 1.6.0      |
 | zitadel/oidc/v3                | 3.49.2             |
+| YAML 配置解析 gopkg.in/yaml.v3 | 3.0.1              |
 | React / Ant Design             | 19.3.0 / 6.6.5     |
 | TypeScript / Vite              | 7.0.2 / 8.3.1      |
 | Vitest / Playwright            | 5.0.1 / 1.63.0     |
@@ -24,7 +25,8 @@ SQLite 通过 CGO 驱动访问，构建需要 C 编译器。容器最终镜像�
 | 文件                                  | 职责                                             |
 | ------------------------------------- | ------------------------------------------------ |
 | `cmd/burrow/main.go`                  | 启动、迁移、管理员初始化、签名密钥轮换、健康检查 |
-| `core.go`、`models.go`、`migrations/` | 配置、数据库、模型、显式迁移、密码及加密         |
+| `config.go`、`configs/`               | YAML 默认配置、环境覆盖及开发主密钥文件          |
+| `core.go`、`models.go`、`migrations/` | 数据库、模型、显式迁移、密码及加密               |
 | `http.go`                             | 会话、本地登录、偏好、主页、CSRF、静态资源       |
 | `admin.go`、`mutation.go`             | 管理 API、RBAC、管理员保护、事务内权限复查与审计 |
 | `oidc_storage.go`、`oidc_http.go`     | 下游 OP 库适配、授权、Token、JWKS 与退出         |

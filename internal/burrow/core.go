@@ -12,8 +12,6 @@ import (
 	"errors"
 	"fmt"
 	"net/netip"
-	"net/url"
-	"os"
 	"strings"
 	"sync"
 	"time"
@@ -31,60 +29,6 @@ type Config struct {
 	MasterKey                                                   [32]byte
 	AllowPrivateProviders                                       bool
 	SessionTTL, TokenTTL, AuthCodeTTL, LoginTTL, EventRetention time.Duration
-}
-
-func LoadConfig() (Config, error) {
-	c := Config{Env: env("BURROW_ENV", "dev"), ListenAddr: env("BURROW_LISTEN_ADDR", ":8080"), Issuer: strings.TrimRight(env("BURROW_ISSUER", "http://localhost:8080"), "/"), DBDriver: env("BURROW_DB_DRIVER", "sqlite"), DBDSN: env("BURROW_DB_DSN", "burrow.db"), StaticDir: env("BURROW_STATIC_DIR", "web/dist"), AllowPrivateProviders: os.Getenv("BURROW_ALLOW_PRIVATE_PROVIDERS") == "true"}
-	if c.Env == "development" {
-		c.Env = "dev"
-	}
-	if c.Env == "production" {
-		c.Env = "prod"
-	}
-	if c.Env != "dev" && c.Env != "prod" {
-		return c, errors.New("BURROW_ENV must be dev or prod")
-	}
-	if c.Env == "prod" && c.DBDriver != "postgres" {
-		return c, errors.New("production requires PostgreSQL")
-	}
-	for name, target := range map[string]*time.Duration{"SESSION_TTL": &c.SessionTTL, "TOKEN_TTL": &c.TokenTTL, "AUTH_CODE_TTL": &c.AuthCodeTTL, "LOGIN_TTL": &c.LoginTTL, "EVENT_RETENTION": &c.EventRetention} {
-		if raw := os.Getenv("BURROW_" + name); raw != "" {
-			d, e := time.ParseDuration(raw)
-			if e != nil || d <= 0 {
-				return c, fmt.Errorf("invalid BURROW_%s", name)
-			}
-			*target = d
-		}
-	}
-	c.defaults()
-	for name, target := range map[string]*[]netip.Prefix{"PROVIDER_ALLOWED_CIDRS": &c.ProviderAllowedCIDRs, "TRUSTED_PROXIES": &c.TrustedProxies} {
-		for _, raw := range strings.Split(os.Getenv("BURROW_"+name), ",") {
-			if strings.TrimSpace(raw) == "" {
-				continue
-			}
-			prefix, err := netip.ParsePrefix(strings.TrimSpace(raw))
-			if err != nil {
-				return c, fmt.Errorf("invalid BURROW_%s CIDR", name)
-			}
-			*target = append(*target, prefix)
-		}
-	}
-	key, err := base64.StdEncoding.DecodeString(os.Getenv("BURROW_MASTER_KEY"))
-	if err != nil || len(key) != 32 {
-		return c, errors.New("BURROW_MASTER_KEY must be base64 of 32 random bytes")
-	}
-	copy(c.MasterKey[:], key)
-	u, err := url.Parse(c.Issuer)
-	if err != nil || u.Host == "" || u.User != nil || u.RawQuery != "" || u.Fragment != "" || u.Path != "" || (u.Scheme != "https" && !(c.Env == "dev" && u.Scheme == "http")) {
-		return c, errors.New("invalid BURROW_ISSUER (production requires HTTPS, no path/query)")
-	}
-	return c, nil
-}
-func env(k, d string) string {
-	if v := os.Getenv(k); v != "" {
-		return v
-	}
-	return d
 }
 
 type Store struct {
@@ -335,19 +279,20 @@ func invalid(field string) error { return fmt.Errorf("invalid_%s", field) }
 var initialMigration string
 
 func (c *Config) defaults() {
+	f := configDefaults()
 	if c.SessionTTL == 0 {
-		c.SessionTTL = 8 * time.Hour
+		c.SessionTTL = f.Session.TTL
 	}
 	if c.TokenTTL == 0 {
-		c.TokenTTL = 5 * time.Minute
+		c.TokenTTL = f.OIDC.TokenTTL
 	}
 	if c.AuthCodeTTL == 0 {
-		c.AuthCodeTTL = time.Minute
+		c.AuthCodeTTL = f.OIDC.AuthCodeTTL
 	}
 	if c.LoginTTL == 0 {
-		c.LoginTTL = 10 * time.Minute
+		c.LoginTTL = f.OIDC.LoginTTL
 	}
 	if c.EventRetention == 0 {
-		c.EventRetention = 90 * 24 * time.Hour
+		c.EventRetention = f.Audit.Retention
 	}
 }

@@ -1,17 +1,66 @@
-.codex/
-.serena/
-*.tsbuildinfo
+# Environment files, local configuration and secrets
 .env
 .env.*
 !.env.example
-node_modules/
-dist/
-bin/
-data/
+.envrc
+.direnv/
+/configs/*.local.yaml
+/configs/*.local.yml
+/configs/config.*.yaml
+/configs/config.*.yml
+*.pem
+*.key
+*.p12
+*.pfx
+
+# Local tools, agent state and worktrees
+.codex/
+.serena/
+.agents/
+.claude/
+.worktrees/
+.mcp.json
+
+# Editors and operating systems
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+Desktop.ini
+*.swp
+*.swo
+*~
+
+# Go binaries, build caches and temporary output
+/bin/
+/tmp/
+/burrow
+/burrow.exe
+*.test
+*.out
+*.prof
+
+# Local databases, backups and runtime data
+/data/
+/postgres-data/
 *.db
 *.db-*
-*.sqlite*
+*.sqlite
+*.sqlite3
+*.sqlite-*
+*.sqlite3-*
+*.dump
+*.backup
+*.log
+
+# Bun, Vite and TypeScript output (including example clients)
+node_modules/
+dist/
+.vite/
+*.tsbuildinfo
+
+# Coverage and browser test artifacts
 coverage/
 test-results/
 playwright-report/
-.DS_Store
+blob-report/
