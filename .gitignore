@@ -14,7 +14,8 @@
 *.pfx
 
 # Local tools, agent state and worktrees
-.codex/
+/.codex/*
+!/.codex/config.toml
 .serena/
 .agents/
 .claude/

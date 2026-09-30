@@ -1,0 +1,21 @@
+[mcp_servers.context7]
+url = "https://mcp.context7.com/mcp"
+env_http_headers = { "CONTEXT7_API_KEY" = "CONTEXT7_API_KEY" }
+
+[mcp_servers.mem0]
+url = "https://mcp.mem0.ai/mcp/"
+bearer_token_env_var = "MEM0_API_KEY"
+
+[mcp_servers.mem0.tools.add_memory]
+approval_mode = "approve"
+
+[mcp_servers.serena]
+startup_timeout_sec = 15
+command = "serena"
+args = ["start-mcp-server", "--project-from-cwd", "--context=codex"]
+
+[plugins."superpowers@openai-curated"]
+enabled = true
+
+[plugins."build-web-apps@openai-curated"]
+enabled = true
