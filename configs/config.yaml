@@ -2,6 +2,14 @@
 # with BURROW_* variables from .env. Native commands never load .env.
 env: dev
 
+bootstrap:
+  admin_username: admin
+  admin_name: Administrator
+  admin_email: ""
+  # Public development example; production seed requires an independent value.
+  # Used only for first creation. Re-running seed never resets the password.
+  admin_password: Burrow-development-admin-2026
+
 server:
   listen_addr: :8080
   issuer: http://localhost:8080

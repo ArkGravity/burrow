@@ -4,13 +4,12 @@ GO ?= go
 BUN ?= bun
 PRETTIER ?= prettier
 CONFIG ?= configs/config.yaml
-ADMIN_USERNAME ?= admin
 COMPOSE_ENV ?= .env
 COMPOSE_PROJECT ?= burrow
 COMPOSE_PROFILES ?= local-db
 COMPOSE = docker compose --env-file "$(COMPOSE_ENV)" --project-name "$(COMPOSE_PROJECT)" $(foreach profile,$(COMPOSE_PROFILES),--profile $(profile))
 
-.PHONY: help deps run migrate admin-init keys-rotate build test test-db test-e2e lint fmt check web-install web web-dev web-check examples-install browser-install compose-config compose-build compose-up compose-down compose-logs compose-admin
+.PHONY: help deps run migrate seed keys-rotate build test test-db test-e2e lint fmt check web-install web web-dev web-check examples-install browser-install compose-config compose-build compose-up compose-down compose-logs compose-seed
 
 help: ## Show available commands
 	@awk 'BEGIN {FS = ":.*## "; printf "Burrow development commands\n\n"} /^[a-zA-Z_-]+:.*## / {printf "  %-19s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -24,8 +23,8 @@ run: ## Run the backend using CONFIG (default: configs/config.yaml)
 migrate: ## Apply database migrations and initialize signing keys
 	$(GO) run ./cmd/burrow migrate --config "$(CONFIG)"
 
-admin-init: ## Create the initial administrator; read its password from stdin
-	$(GO) run ./cmd/burrow admin-init --config "$(CONFIG)" --username "$(ADMIN_USERNAME)" --password-stdin
+seed: ## Seed default roles and bootstrap the administrator from configuration
+	$(GO) run ./cmd/burrow seed --config "$(CONFIG)"
 
 keys-rotate: ## Rotate OIDC signing keys while retaining existing public keys
 	$(GO) run ./cmd/burrow keys-rotate --config "$(CONFIG)"
@@ -84,8 +83,8 @@ compose-up: ## Start the configured Compose stack using local images
 compose-down: ## Stop the Compose stack while preserving database volumes
 	$(COMPOSE) down
 
-compose-logs: ## Follow application and migration logs
-	$(COMPOSE) logs -f app migrate
+compose-logs: ## Follow application, migration and seed logs
+	$(COMPOSE) logs -f app migrate seed
 
-compose-admin: ## Initialize the Compose administrator from stdin
-	$(COMPOSE) run --rm --no-deps -T app admin-init --username "$(ADMIN_USERNAME)" --password-stdin
+compose-seed: ## Re-run seed without changing existing administrator credentials
+	$(COMPOSE) run --rm --no-deps seed

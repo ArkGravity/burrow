@@ -20,8 +20,9 @@ import (
 )
 
 type fileConfig struct {
-	Env    string `yaml:"env"`
-	Server struct {
+	Bootstrap BootstrapConfig `yaml:"bootstrap"`
+	Env       string          `yaml:"env"`
+	Server    struct {
 		ListenAddr     string   `yaml:"listen_addr"`
 		Issuer         string   `yaml:"issuer"`
 		StaticDir      string   `yaml:"static_dir"`
@@ -98,6 +99,8 @@ func LoadConfigFile(path string) (Config, error) {
 		"ENV": &f.Env, "LISTEN_ADDR": &f.Server.ListenAddr, "ISSUER": &f.Server.Issuer,
 		"STATIC_DIR": &f.Server.StaticDir, "DB_DRIVER": &f.Database.Driver, "DB_DSN": &f.Database.DSN,
 		"MASTER_KEY": &f.Security.MasterKey, "MASTER_KEY_FILE": &f.Security.MasterKeyFile,
+		"BOOTSTRAP_ADMIN_USERNAME": &f.Bootstrap.Username, "BOOTSTRAP_ADMIN_NAME": &f.Bootstrap.Name,
+		"BOOTSTRAP_ADMIN_EMAIL": &f.Bootstrap.Email, "BOOTSTRAP_ADMIN_PASSWORD": &f.Bootstrap.Password,
 	} {
 		if value, ok := os.LookupEnv("BURROW_" + name); ok {
 			*target = value
@@ -129,7 +132,8 @@ func LoadConfigFile(path string) (Config, error) {
 		}
 	}
 	c := Config{Env: f.Env, ListenAddr: f.Server.ListenAddr, Issuer: strings.TrimRight(f.Server.Issuer, "/"), StaticDir: f.Server.StaticDir,
-		DBDriver: f.Database.Driver, DBDSN: f.Database.DSN, AllowPrivateProviders: f.Providers.AllowPrivate,
+		Bootstrap: f.Bootstrap,
+		DBDriver:  f.Database.Driver, DBDSN: f.Database.DSN, AllowPrivateProviders: f.Providers.AllowPrivate,
 		SessionTTL: f.Session.TTL, TokenTTL: f.OIDC.TokenTTL, AuthCodeTTL: f.OIDC.AuthCodeTTL, LoginTTL: f.OIDC.LoginTTL, EventRetention: f.Audit.Retention}
 	if c.Env == "development" {
 		c.Env = "dev"

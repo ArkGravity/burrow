@@ -29,6 +29,7 @@ import { api, write, APIError, type Row, type List } from "../lib/api";
 import { can } from "../lib/access";
 import { useSession } from "../lib/session";
 import { useI18n, errorKey, type TranslationKey } from "../lib/i18n";
+import { GroupTags, type GroupSummary } from "../components/GroupTags";
 
 type Field = {
   key: string;
@@ -199,7 +200,12 @@ export function Resources({ resource }: { resource: string }) {
                 : v,
             ]),
           )
-        : { enabled: true, localEnabled: true, clientType: "web" },
+        : {
+            enabled: true,
+            localEnabled: true,
+            clientType: "web",
+            ...(resource === "users" ? { roleIds: ["viewer"] } : {}),
+          },
     );
     const sources = [
       ...new Set(def.fields.flatMap((f) => (f.source ? [f.source] : []))),
@@ -292,7 +298,22 @@ export function Resources({ resource }: { resource: string }) {
       ),
     },
     ...(resource === "users"
-      ? [{ title: t("email"), dataIndex: "email", key: "email" }]
+      ? [
+          { title: t("email"), dataIndex: "email", key: "email" },
+          {
+            title: t("groups"),
+            key: "groups",
+            render: (_: unknown, row: Row) => (
+              <GroupTags
+                groups={
+                  Array.isArray(row.groups)
+                    ? (row.groups as GroupSummary[])
+                    : []
+                }
+              />
+            ),
+          },
+        ]
       : []),
     ...(resource === "providers"
       ? [{ title: t("issuer"), dataIndex: "issuer", key: "issuer" }]

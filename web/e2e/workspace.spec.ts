@@ -35,6 +35,11 @@ test("administrator provisions access and ordinary users see only their portal",
   ).toBeVisible();
   await page.getByRole("link", { name: "Users", exact: true }).click();
   await page.getByRole("button", { name: "Create", exact: true }).click();
+  await expect(
+    page
+      .locator(".ant-drawer .ant-select-selection-item")
+      .filter({ hasText: "Viewer" }),
+  ).toBeVisible();
   await page.getByLabel("Username", { exact: true }).fill("alice");
   await page.getByLabel("Name", { exact: true }).fill("Alice");
   await page.getByLabel("Email", { exact: true }).fill("alice@example.test");
@@ -43,6 +48,12 @@ test("administrator provisions access and ordinary users see only their portal",
     .fill("Alice-initial-password-2026");
   await page.getByRole("button", { name: "Save changes", exact: true }).click();
   await expect(page.getByText("alice@example.test")).toBeVisible();
+  const createdUsers = await (await page.request.get("/api/v1/users")).json();
+  expect(
+    createdUsers.items.find(
+      (user: { username: string }) => user.username === "alice",
+    ).roleIds,
+  ).toEqual(["viewer"]);
   await page.getByRole("link", { name: "Applications", exact: true }).click();
   await page.getByRole("button", { name: "Create", exact: true }).click();
   await page.getByLabel("Name", { exact: true }).fill("Engineering");
@@ -84,6 +95,16 @@ test("administrator provisions access and ordinary users see only their portal",
   await page.getByRole("button", { name: "Save changes", exact: true }).click();
   await expect(
     page.getByText("Engineering team", { exact: true }),
+  ).toBeVisible();
+  await page.getByRole("link", { name: "Users", exact: true }).click();
+  await expect(
+    page.getByRole("columnheader", { name: "Groups", exact: true }),
+  ).toBeVisible();
+  await expect(
+    page
+      .getByRole("row")
+      .filter({ hasText: "alice@example.test" })
+      .getByText("Engineering team", { exact: true }),
   ).toBeVisible();
   await page.screenshot({
     path: "test-results/admin-workspace.png",

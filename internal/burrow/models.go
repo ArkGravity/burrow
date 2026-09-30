@@ -3,18 +3,23 @@ package burrow
 import "time"
 
 type User struct {
-	ID                 string   `gorm:"primaryKey" json:"id"`
-	Username           string   `gorm:"uniqueIndex;not null" json:"username"`
-	Name               string   `json:"name"`
-	Email              string   `json:"email"`
-	Enabled            bool     `json:"enabled"`
-	LocalEnabled       bool     `json:"localEnabled"`
-	PasswordHash       string   `json:"-"`
-	MustChangePassword bool     `json:"mustChangePassword"`
-	Language           string   `json:"language"`
-	Theme              string   `json:"theme"`
-	RoleIDs            []string `gorm:"-" json:"roleIds"`
-	GroupIDs           []string `gorm:"-" json:"groupIds"`
+	ID                 string     `gorm:"primaryKey" json:"id"`
+	Username           string     `gorm:"uniqueIndex;not null" json:"username"`
+	Name               string     `json:"name"`
+	Email              string     `json:"email"`
+	Enabled            bool       `json:"enabled"`
+	LocalEnabled       bool       `json:"localEnabled"`
+	PasswordHash       string     `json:"-"`
+	MustChangePassword bool       `json:"mustChangePassword"`
+	Language           string     `json:"language"`
+	Theme              string     `json:"theme"`
+	RoleIDs            []string   `gorm:"-" json:"roleIds"`
+	GroupIDs           []string   `gorm:"-" json:"groupIds"`
+	Groups             []GroupRef `gorm:"-" json:"groups"`
+}
+type GroupRef struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
 }
 type Group struct {
 	ID          string   `gorm:"primaryKey" json:"id"`

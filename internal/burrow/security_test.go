@@ -131,7 +131,7 @@ func testServer(t *testing.T, driver string) (*Server, *browser, User) {
 	if e := s.RotateKeys(); e != nil {
 		t.Fatal(e)
 	}
-	if e := s.InitAdmin("admin", testPassword); e != nil {
+	if e := s.Seed(BootstrapConfig{Username: "admin", Password: testPassword}); e != nil {
 		t.Fatal(e)
 	}
 	b, e := NewServer(s)
@@ -173,7 +173,7 @@ func TestCSRFAndForcedPassword(t *testing.T) {
 	if e := s.RotateKeys(); e != nil {
 		t.Fatal(e)
 	}
-	if e := s.InitAdmin("admin", testPassword); e != nil {
+	if e := s.Seed(BootstrapConfig{Username: "admin", Password: testPassword}); e != nil {
 		t.Fatal(e)
 	}
 	b, e := NewServer(s)

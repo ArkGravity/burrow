@@ -5,7 +5,7 @@ sessions, users, groups, roles, permissions, application access and upstream OID
 providers. The Go backend and React web UI ship as one `burrow` binary.
 
 - Repository: https://github.com/ArkGravity/burrow
-- [Configuration](configs/config.yaml) · [Documentation](docs/README.md) · [OIDC examples](examples/README.md)
+- [Configuration](configs/config.yaml) · [Documentation](docs/README.md) · [Project conventions](AGENTS.md) · [OIDC examples](examples/README.md)
 
 The UI supports English and Simplified Chinese, with light, dark and system themes.
 PostgreSQL is used in production; SQLite is available for local development.
@@ -29,7 +29,7 @@ from the repository root.
 ```bash
 make deps
 make migrate
-make admin-init   # enter a temporary password on stdin; minimum 12 characters
+make seed         # default roles and administrator from configuration
 make run          # backend on http://localhost:8080
 ```
 
@@ -39,10 +39,12 @@ In another terminal:
 make web-dev      # Vite on http://localhost:5173
 ```
 
-Open http://localhost:5173 and change the initial password when prompted. Use
-`make admin-init ADMIN_USERNAME=your-name` to choose the bootstrap username.
-There is no built-in administrator password; bootstrap never overwrites an
-existing account.
+Open http://localhost:5173 with development credentials `admin` /
+`Burrow-development-admin-2026`, then change the password when prompted.
+Customize `bootstrap.admin_username`, `admin_name`, `admin_email` and
+`admin_password` in your ignored local YAML before seeding a new database.
+`make seed` is noninteractive and never prints a password. Re-running it preserves
+existing administrator credentials, account state and user assignments.
 
 Native commands read `configs/config.yaml` directly. No `.env` file, shell
 sourcing or exported variables are needed. The YAML and `.env.example` share a
@@ -94,13 +96,14 @@ skipped by `make test`. Browser tests use temporary SQLite data and local ports
 ```bash
 make build
 ./bin/burrow migrate --config configs/config.yaml
-./bin/burrow admin-init --config configs/config.yaml --password-stdin
+./bin/burrow seed --config configs/config.yaml
 ./bin/burrow serve --config configs/config.yaml
 ```
 
 Open http://localhost:8080. The binary serves the UI, management API and OIDC
 endpoints on one port. Use this mode for end-to-end OIDC integration; Vite is for
-UI development. Run administrator bootstrap only for a new database.
+UI development. Seed can be repeated to add missing default roles while preserving
+existing administrator credentials.
 
 `/healthz` reports process liveness; `/readyz` checks database migration state.
 Startup also verifies that signing keys can be decrypted. Signing keys and
@@ -120,16 +123,17 @@ openssl rand -hex 24     # PostgreSQL password
 make compose-config
 make compose-build
 make compose-up
-make compose-admin      # temporary administrator password from stdin
+make compose-seed       # optional repeat; existing credentials are preserved
 ```
 
 The default `local-db` profile runs PostgreSQL 17. The migration service retries
-database connections during startup, then exits successfully before the app
-starts. Open http://localhost:8080. The application binds to host loopback by
+database connections during startup, then seed initializes the default roles
+and administrator. The app starts only after both one-shot services succeed. Open http://localhost:8080. The application binds to host loopback by
 default; PostgreSQL is not published to the host.
 
-For production, set `BURROW_ENV=prod`, an HTTPS `BURROW_ISSUER` and a PostgreSQL
-DSN with appropriate TLS settings. Place the app behind your TLS reverse proxy,
+For production, set `BURROW_ENV=prod`, an HTTPS `BURROW_ISSUER`, an independent
+`BURROW_BOOTSTRAP_ADMIN_PASSWORD` for initial seeding and a PostgreSQL DSN with
+appropriate TLS settings. Production seed rejects the public example password. Place the app behind your TLS reverse proxy,
 preserve the browser Origin, and configure trusted proxy CIDRs for forwarded
 client addresses. Burrow runs as a single instance and needs no Redis or queue.
 
@@ -138,7 +142,7 @@ isolate deployments. Set `BURROW_IMAGE` to a fixed image tag or digest when usin
 your own registry. For an external PostgreSQL database, omit the local profile:
 
 ```bash
-docker compose --env-file .env.prod --project-name burrow-prod pull app migrate
+docker compose --env-file .env.prod --project-name burrow-prod pull app migrate seed
 make compose-up COMPOSE_ENV=.env.prod COMPOSE_PROJECT=burrow-prod COMPOSE_PROFILES=
 ```
 
@@ -160,6 +164,22 @@ Management APIs and OIDC authorization enforce current permissions server-side.
 Authorization-code exchange checks access again. The last enabled local
 administrator is protected. Burrow manages identity and application access;
 applications manage their own business permissions.
+
+Seed supplies three immutable default roles:
+
+| Role          | Default access                                                                                                           |
+| ------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| Administrator | All management and APP access, subject to account/APP state and authentication-source restrictions                       |
+| Editor        | Read management resources; maintain APP and Provider configuration; no user/password management or authorization changes |
+| Viewer        | Personal profile and authorized application portal only; no management permissions                                       |
+
+New users receive Viewer when roles are omitted; the creation form preselects it.
+Explicit roles, including an empty list, are respected. Existing users are not
+backfilled. When upgrading an existing instance, run `make migrate` and `make seed`
+using its original bootstrap username to add the new default roles. APP login remains an explicit grant through ordinary roles or groups;
+the default roles cannot be assigned blanket APP login permissions. The Users
+list shows group names so administrators can inspect membership directly.
+See [seed and default roles](docs/development/seed.md).
 
 | Capability            | Supported behavior                                                               |
 | --------------------- | -------------------------------------------------------------------------------- |

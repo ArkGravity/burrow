@@ -20,6 +20,10 @@
 - 任务按依赖顺序执行。每个任务中的“编写断言→确认失败→最小实现→验证→提交”拆成短步骤；表格/文案等低风险改动使用构建与页面检查，不添加镜像实现的测试。
 - 每次只暂存任务列出的文件，用 `rtk git diff --cached --check` 后提交；不要使用无范围的 `git add .`。
 
+## 后续调整（2026-09-30）
+
+用户授权以非交互式 seed 替换 admin-init，新增内置 Editor / Viewer，Viewer 限定个人资料与已授权 APP 门户并作为新增用户默认角色；Users 表格新增组名列。现有迁移不改写，升级后运行 seed 补齐默认角色，已有用户不自动追加 Viewer。
+
 ## 版本基线与选型验证
 
 ### 实施记录（2026-09-28）
@@ -50,26 +54,26 @@
 
 ## 文件职责与边界
 
-| 路径                    | 职责                                                      |
-| ----------------------- | --------------------------------------------------------- |
-| `cmd/burrow/main.go`    | serve/migrate/admin-init/keys-rotate/healthcheck 命令装配 |
-| `internal/config/`      | 读取、校验环境配置，不输出秘密                            |
-| `internal/database/`    | GORM 连接、显式迁移、事务/锁及双数据库测试设施            |
-| `internal/identity/`    | 用户、组、密码、外部身份绑定                              |
-| `internal/authz/`       | 角色/权限、管理员不变量与授权判断                         |
-| `internal/session/`     | 统一会话、首次改密限制、认证上下文                        |
-| `internal/application/` | 客户端、回调、登录方式、客户端密钥                        |
-| `internal/provider/`    | 上游 OIDC 配置、网络访问策略、登录事务                    |
-| `internal/oidcserver/`  | ZITADEL OP 适配、协议状态、UserInfo、退出                 |
-| `internal/keys/`        | 加密封装、签名密钥保存和轮换                              |
-| `internal/event/`       | 事件、统计与清理                                          |
-| `internal/httpapi/`     | 路由、统一错误、鉴权/CSRF/限流与模块 handler              |
-| `internal/server/`      | 进程生命周期、探针、后台清理                              |
-| `web/`                  | React 源码、静态资源嵌入入口、构建与浏览器测试            |
-| `tests/integration/`    | HTTP、数据库与协议边界测试                                |
-| `examples/`             | 独立客户端实现的 Web/SPA 联调样例                         |
-| `docker-compose.yml`   | 根目录唯一 Compose 配置，支持本地构建和固定镜像           |
-| `.env.example`          | 配置变量说明；真实环境文件不提交                          |
+| 路径                    | 职责                                                |
+| ----------------------- | --------------------------------------------------- |
+| `cmd/burrow/main.go`    | serve/migrate/seed/keys-rotate/healthcheck 命令装配 |
+| `internal/config/`      | 读取、校验环境配置，不输出秘密                      |
+| `internal/database/`    | GORM 连接、显式迁移、事务/锁及双数据库测试设施      |
+| `internal/identity/`    | 用户、组、密码、外部身份绑定                        |
+| `internal/authz/`       | 角色/权限、管理员不变量与授权判断                   |
+| `internal/session/`     | 统一会话、首次改密限制、认证上下文                  |
+| `internal/application/` | 客户端、回调、登录方式、客户端密钥                  |
+| `internal/provider/`    | 上游 OIDC 配置、网络访问策略、登录事务              |
+| `internal/oidcserver/`  | ZITADEL OP 适配、协议状态、UserInfo、退出           |
+| `internal/keys/`        | 加密封装、签名密钥保存和轮换                        |
+| `internal/event/`       | 事件、统计与清理                                    |
+| `internal/httpapi/`     | 路由、统一错误、鉴权/CSRF/限流与模块 handler        |
+| `internal/server/`      | 进程生命周期、探针、后台清理                        |
+| `web/`                  | React 源码、静态资源嵌入入口、构建与浏览器测试      |
+| `tests/integration/`    | HTTP、数据库与协议边界测试                          |
+| `examples/`             | 独立客户端实现的 Web/SPA 联调样例                   |
+| `docker-compose.yml`    | 根目录唯一 Compose 配置，支持本地构建和固定镜像     |
+| `.env.example`          | 配置变量说明；真实环境文件不提交                    |
 
 模块以内聚的小文件组织，API handler 只做输入输出与业务调用。不要将所有模型放在一个巨型 models.go，也不要让整个业务层使用 op.AuthRequest。
 
@@ -126,7 +130,7 @@ REST 错误格式固定为 `{ "error": { "code": "FORBIDDEN", "requestId": "…"
 - [ ] 先写密码校验、错误主密钥/篡改密文失败、轮换后旧公钥保留、重复初始化拒绝的测试；`rtk go test ./internal/keys ./internal/identity -v` 预期失败。
 - [ ] 密码使用 Argon2id PHC 编码，随机盐；解码时限制参数避免恶意哈希触发无界资源消耗。高熵随机客户端密钥另用 SHA-256 验证哈希和常量时间比较。
 - [ ] 使用 AES-256-GCM 封装上游密钥与 RSA 私钥，AAD 绑定用途和对象 ID；RSA 3072 位、RS256、随机 kid。提供持久化读取与显式轮换，不每次启动生成。
-- [ ] 添加 `admin-init --username admin --password-stdin`，数据库事务创建管理员和内置权限。密码从 stdin 输入，stdout/日志不回显，失败不留半个账号；初始化账号也要求首次改密。
+- [ ] 添加非交互式 `seed`，从 bootstrap 配置读取管理员初始凭据，数据库事务补齐内置角色并创建初始管理员；重复运行不覆盖已有凭据，首次登录要求改密。
 - [ ] 添加 `keys-rotate` 运维命令；私钥退役后旧公钥至少保留令牌有效期加 60 秒容差。
 - [ ] 测试通过后提交 `feat: add credentials keys and admin bootstrap`。
 
@@ -302,7 +306,7 @@ REST 错误格式固定为 `{ "error": { "code": "FORBIDDEN", "requestId": "…"
 
 **创建：** `README.md`、`docs/operations/recovery.md`、`.github/workflows/ci.yml`；**修改：** 依赖记录、OIDC 接入文档。
 
-- [ ] 根 README 给出工具版本、Bun 安装、复制环境、主密钥生成、SQLite/PostgreSQL 切换、migrate、admin-init、Go/Bun 开发启动、前端代理、测试与构建命令。按全新目录顺序实际复现。
+- [ ] 根 README 给出工具版本、Bun 安装、复制环境、主密钥生成、SQLite/PostgreSQL 切换、migrate、seed、Go/Bun 开发启动、前端代理、测试与构建命令。按全新目录顺序实际复现。
 - [ ] 说明临时密码改密、首位管理员、APP/Provider 配置、独立客户端接入、token/会话有效期以及不保证跨 APP 同步退出。
 - [ ] 恢复文档覆盖 PostgreSQL 备份+主密钥保管、签名轮换、数据库恢复、迁移失败与回滚限制，不在示例中包含真实凭据。
 - [ ] CI 包含 Go unit/vet、双库 integration、前端类型/行为/构建、浏览器关键路径与根目录 Compose 配置检查。CI service 数据库不新增部署 YAML，不进行生产部署。

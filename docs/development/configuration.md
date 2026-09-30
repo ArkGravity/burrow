@@ -74,7 +74,7 @@ OIDC signing keys, not the master encryption key. See [recovery](../operations/r
 ## Compose
 
 Only Docker Compose reads `.env`. Its interpolation passes settings to app and
-migrate as environment variables; containers use embedded defaults for the rest.
+migrate and seed as environment variables; containers use embedded defaults for the rest.
 The local development YAML is not mounted into containers. Compose always uses
 PostgreSQL and receives its master key from `.env`. The example includes the
 public development key; replace it before using `BURROW_ENV=prod`.
@@ -82,3 +82,22 @@ public development key; replace it before using `BURROW_ENV=prod`.
 `make compose-*` accepts `COMPOSE_ENV`, `COMPOSE_PROJECT` and `COMPOSE_PROFILES`.
 Defaults are `.env`, `burrow` and `local-db`. Set `COMPOSE_PROFILES=` for an external
 database. `make compose-up` uses existing local images; build or pull them first.
+
+## Administrator bootstrap
+
+`make seed` reads the `bootstrap` section. It creates the three default roles and
+the initial administrator without stdin prompts or password output. The username
+is `admin`, display name `Administrator`, email empty and development password
+`Burrow-development-admin-2026`. Override these settings before first creation:
+
+| YAML field                 | Environment override              |
+| -------------------------- | --------------------------------- |
+| `bootstrap.admin_username` | `BURROW_BOOTSTRAP_ADMIN_USERNAME` |
+| `bootstrap.admin_name`     | `BURROW_BOOTSTRAP_ADMIN_NAME`     |
+| `bootstrap.admin_email`    | `BURROW_BOOTSTRAP_ADMIN_EMAIL`    |
+| `bootstrap.admin_password` | `BURROW_BOOTSTRAP_ADMIN_PASSWORD` |
+
+Production first-time seed requires an independent 12–256 character password.
+Development falls back to the example if the password is empty. These settings
+do not change an existing administrator. Keep the original bootstrap username
+when upgrading or restoring an existing instance. See [seed](seed.md).

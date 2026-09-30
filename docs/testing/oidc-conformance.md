@@ -31,3 +31,19 @@ sh web/e2e/run.sh
 ## 范围限制
 
 未运行官方认证服务、生产反向代理/HTTPS 基础设施及远程 GitHub Actions。CI 工作流已提供，但本地结果不代表远程工作流已经执行。前端构建通过，仍有单个入口 bundle 超过 500 kB 的体积提示。Refresh Token、其他授权类型、多实例与跨 APP 同步退出不在首版范围。
+
+## Seed, default roles and user groups (2026-09-30)
+
+- `make test-db lint` with a dedicated PostgreSQL 17 test DSN passed the full
+  SQLite/PostgreSQL race suite and Go static analysis.
+- New tests cover repeated seed preserving passwords/status, rejection of an
+  ordinary-account username collision and production example credentials, Viewer
+  defaults versus explicit role choices, role boundaries, group summaries for a
+  users-only reader, and rejection of blanket APP grants to built-in roles.
+- `make web-check` passed typecheck and two unit tests.
+- `make test-e2e` passed both Chromium scenarios, including two noninteractive
+  seed invocations, Viewer preselection/persistence, the Users Groups column,
+  ordinary portal access and independent Web/SPA OIDC clients.
+- `make compose-config COMPOSE_ENV=.env.example` validated the migrate → seed →
+  app dependency chain. No container image build/start was performed for this
+  change; the browser runner built and exercised the embedded Go binary.

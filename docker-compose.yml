@@ -18,6 +18,11 @@ x-app: &app
     BURROW_EVENT_RETENTION: ${BURROW_EVENT_RETENTION:-2160h}
     BURROW_TRUSTED_PROXIES: ${BURROW_TRUSTED_PROXIES:-}
     BURROW_PROVIDER_ALLOWED_CIDRS: ${BURROW_PROVIDER_ALLOWED_CIDRS:-}
+    BURROW_BOOTSTRAP_ADMIN_USERNAME: ${BURROW_BOOTSTRAP_ADMIN_USERNAME:-admin}
+    BURROW_BOOTSTRAP_ADMIN_NAME: ${BURROW_BOOTSTRAP_ADMIN_NAME:-Administrator}
+    BURROW_BOOTSTRAP_ADMIN_EMAIL: ${BURROW_BOOTSTRAP_ADMIN_EMAIL:-}
+    # Blank uses the example only in development; production seed rejects it.
+    BURROW_BOOTSTRAP_ADMIN_PASSWORD: ${BURROW_BOOTSTRAP_ADMIN_PASSWORD:-}
   read_only: true
   tmpfs:
     - /tmp
@@ -34,7 +39,7 @@ services:
     ports:
       - "${BURROW_BIND_ADDR:-127.0.0.1}:${BURROW_PORT:-8080}:8080"
     depends_on:
-      migrate:
+      seed:
         condition: service_completed_successfully
     healthcheck:
       test: [CMD, burrow, healthcheck]
@@ -46,6 +51,15 @@ services:
     <<: *app
     command: [migrate]
     restart: "no"
+    healthcheck:
+      disable: true
+  seed:
+    <<: *app
+    command: [seed]
+    restart: "no"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
     healthcheck:
       disable: true
   postgres:

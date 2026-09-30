@@ -5,9 +5,11 @@ targets and Docker Compose deployment.
 
 ## Development
 
+- [Project conventions](../AGENTS.md)
 - [Default configuration](../configs/config.yaml)
 - [Configuration loading, overrides and secrets](development/configuration.md)
 - [Dependencies and implementation layout](development/dependencies.md)
+- [Seed and default role boundaries](development/seed.md)
 - [OIDC adapter boundaries](development/oidc-adapter.md)
 - [Independent Web and SPA clients](../examples/README.md)
 

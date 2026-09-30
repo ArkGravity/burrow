@@ -24,6 +24,7 @@ import (
 )
 
 type Config struct {
+	Bootstrap                                                   BootstrapConfig
 	ProviderAllowedCIDRs, TrustedProxies                        []netip.Prefix
 	Env, ListenAddr, Issuer, DBDriver, DBDSN, StaticDir         string
 	MasterKey                                                   [32]byte
@@ -207,36 +208,6 @@ func contains(xs []string, x string) bool {
 		}
 	}
 	return false
-}
-func (s *Store) InitAdmin(username, password string) error {
-	h, err := passwordHash(password)
-	if err != nil {
-		return err
-	}
-	if strings.TrimSpace(username) == "" {
-		return errors.New("username required")
-	}
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	return s.DB.Transaction(func(tx *gorm.DB) error {
-		if s.Config.DBDriver == "postgres" {
-			if err := tx.Exec("SELECT pg_advisory_xact_lock(734285622)").Error; err != nil {
-				return err
-			}
-		}
-		var n int64
-		if err := tx.Model(&User{}).Count(&n).Error; err != nil {
-			return err
-		}
-		if n > 0 {
-			return errors.New("administrator already initialized")
-		}
-		u := User{ID: random(18), Username: username, Name: username, Enabled: true, LocalEnabled: true, PasswordHash: h, MustChangePassword: true, Language: "en", Theme: "system"}
-		if err := tx.Create(&u).Error; err != nil {
-			return err
-		}
-		return tx.Create(&UserRole{UserID: u.ID, RoleID: "admin"}).Error
-	})
 }
 func localAdminExists(tx *gorm.DB) error {
 	var users []User

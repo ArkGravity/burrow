@@ -59,8 +59,9 @@ func (b *Server) list(w http.ResponseWriter, r *http.Request, resource string) {
 	}
 	switch values := out.(type) {
 	case *[]User:
-		for i := range *values {
-			b.hydrateUser(b.DB, &(*values)[i])
+		if err := b.hydrateUsers(b.DB, *values); err != nil {
+			fail(w, r, 503, "unavailable")
+			return
 		}
 	case *[]Group:
 		for i := range *values {
@@ -83,11 +84,48 @@ func (b *Server) list(w http.ResponseWriter, r *http.Request, resource string) {
 	}
 	write(w, 200, map[string]any{"items": out, "total": total, "page": p, "pageSize": n})
 }
-func (b *Server) hydrateUser(tx *gorm.DB, u *User) {
-	u.RoleIDs = []string{}
-	u.GroupIDs = []string{}
-	tx.Model(&UserRole{}).Where("user_id = ?", u.ID).Pluck("role_id", &u.RoleIDs)
-	tx.Model(&GroupMember{}).Where("user_id = ?", u.ID).Pluck("group_id", &u.GroupIDs)
+func (b *Server) hydrateUser(tx *gorm.DB, u *User) error {
+	users := []User{*u}
+	if err := b.hydrateUsers(tx, users); err != nil {
+		return err
+	}
+	*u = users[0]
+	return nil
+}
+
+// Resolve memberships for the whole page, without requiring groups:read or
+// exposing group membership lists and role assignments in the user response.
+func (b *Server) hydrateUsers(tx *gorm.DB, users []User) error {
+	if len(users) == 0 {
+		return nil
+	}
+	ids := make([]string, len(users))
+	index := map[string]int{}
+	for i := range users {
+		ids[i] = users[i].ID
+		index[users[i].ID] = i
+		users[i].RoleIDs = []string{}
+		users[i].GroupIDs = []string{}
+		users[i].Groups = []GroupRef{}
+	}
+	var roles []UserRole
+	if err := tx.Where("user_id IN ?", ids).Order("role_id").Find(&roles).Error; err != nil {
+		return err
+	}
+	for _, role := range roles {
+		i := index[role.UserID]
+		users[i].RoleIDs = append(users[i].RoleIDs, role.RoleID)
+	}
+	var groups []struct{ UserID, ID, Name string }
+	if err := tx.Table("group_members").Select("group_members.user_id, groups.id, groups.name").Joins("JOIN groups ON groups.id = group_members.group_id").Where("group_members.user_id IN ?", ids).Order("groups.name, groups.id").Scan(&groups).Error; err != nil {
+		return err
+	}
+	for _, group := range groups {
+		i := index[group.UserID]
+		users[i].GroupIDs = append(users[i].GroupIDs, group.ID)
+		users[i].Groups = append(users[i].Groups, GroupRef{ID: group.ID, Name: group.Name})
+	}
+	return nil
 }
 func (b *Server) hydrateApp(tx *gorm.DB, a *Application) {
 	a.ProviderIDs = []string{}
@@ -254,12 +292,19 @@ func (b *Server) mutate(w http.ResponseWriter, r *http.Request, resource string)
 			if err := b.assign(tx, "users", id, in, admin); err != nil {
 				return err
 			}
+			if _, explicit := in["roleIds"]; creating && !explicit {
+				if err := tx.Create(&UserRole{UserID: id, RoleID: "viewer"}).Error; err != nil {
+					return err
+				}
+			}
 			if !u.Enabled || passwordProvided {
 				if err := tx.Model(&Session{}).Where("user_id = ?", id).Update("revoked", true).Error; err != nil {
 					return err
 				}
 			}
-			b.hydrateUser(tx, &u)
+			if err := b.hydrateUser(tx, &u); err != nil {
+				return err
+			}
 			result = u
 		case "groups":
 			v := Group{ID: id}
@@ -511,8 +556,14 @@ func (b *Server) assign(tx *gorm.DB, resource, id string, in map[string]json.Raw
 				}
 			}
 		case "applications":
-			if contains(ids, "admin") {
-				return errors.New("builtin_role")
+			for _, roleID := range ids {
+				var role Role
+				if err := tx.First(&role, "id = ?", roleID).Error; err != nil {
+					return err
+				}
+				if role.Builtin {
+					return errors.New("builtin_role")
+				}
 			}
 			if e := tx.Where("permission_id = ?", "app:"+id+":login").Delete(&RolePermission{}).Error; e != nil {
 				return e

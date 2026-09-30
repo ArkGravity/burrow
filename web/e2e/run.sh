@@ -15,12 +15,15 @@ export BURROW_DB_DSN="$BURROW_E2E_TMP/burrow.db"
 export BURROW_LISTEN_ADDR=127.0.0.1:18080
 export BURROW_ISSUER=http://localhost:18080
 export BURROW_E2E_URL=http://localhost:18080
+export BURROW_BOOTSTRAP_ADMIN_USERNAME=admin
+export BURROW_BOOTSTRAP_ADMIN_PASSWORD=Initial-admin-password-2026
 bun run --cwd web build
 go build -tags embedweb -o "$BURROW_E2E_TMP/burrow" ./cmd/burrow
 go build -o "$BURROW_E2E_TMP/web-client" ./examples/web-client
 export BURROW_E2E_WEB_BINARY="$BURROW_E2E_TMP/web-client"
 "$BURROW_E2E_TMP/burrow" migrate
-printf '%s\n' 'Initial-admin-password-2026' | "$BURROW_E2E_TMP/burrow" admin-init --username admin
+"$BURROW_E2E_TMP/burrow" seed
+"$BURROW_E2E_TMP/burrow" seed
 "$BURROW_E2E_TMP/burrow" serve >"$BURROW_E2E_TMP/server.log" 2>&1 &
 BURROW_E2E_PID=$!
 BURROW_E2E_READY=0
