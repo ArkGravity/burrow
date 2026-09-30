@@ -175,6 +175,32 @@ when using local overrides. Inspect `make help` for available actions.
 - Keep fixes scoped, preserve unrelated user edits, and synchronize README,
   configuration references and operational guides when behavior changes.
 
+## Codex and project memory
+
+- Track project MCP settings in `.codex/config.toml`; keep other `.codex/`
+  local state ignored. Supply `MEM0_API_KEY` and `CONTEXT7_API_KEY` through the
+  environment, never as literal secrets in tracked configuration.
+- Mem0's platform Project is `ArkGravity`, shared by the Burrow and Optimus
+  repositories. Distinguish repository memories with `metadata.project`:
+  `burrow` for this repository and `optimus` for Optimus. Do not create a separate
+  platform Project or rename these metadata values to `ArkGravity`.
+- Write Burrow memories with `user_id=logic`, `app_id=burrow` and
+  `metadata.project=burrow`. Explicitly filter reads and searches by
+  `user_id=logic` and `metadata.project=burrow`; optionally also filter by
+  `app_id=burrow`. Do not rely on the MCP server's default user scope.
+- Recall relevant Burrow memories before substantive project work. Treat current
+  source, executable documentation and user instructions as authoritative when
+  stored memories disagree. Save durable decisions, conventions and verified
+  checkpoints after completing work; update existing topic memories when useful
+  instead of creating duplicates. Never store credentials or local secret data.
+- The project Mem0 server uses `default_tools_approval_mode = "approve"`, a
+  15-second startup timeout and a 60-second tool timeout. This enables automatic
+  tool approval within the user's authorized task; it does not authorize unrelated
+  changes or deletion of other projects' memories.
+- Report failed memory operations accurately. Do not claim a checkpoint was
+  saved until the operation succeeds, and verify important writes by reading them
+  back. Keep historical test results distinct from checks run in the current task.
+
 ## Verification and delivery
 
 | Command                                        | Coverage                                                |
