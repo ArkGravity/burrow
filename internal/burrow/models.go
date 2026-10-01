@@ -62,20 +62,21 @@ type ApplicationProvider struct {
 	ProviderID    string `gorm:"primaryKey"`
 }
 type Application struct {
-	ID           string   `gorm:"primaryKey" json:"id"`
-	Name         string   `json:"name"`
-	ClientID     string   `gorm:"uniqueIndex;not null" json:"clientId"`
-	ClientType   string   `json:"clientType"`
-	SecretHash   string   `json:"-"`
-	Enabled      bool     `json:"enabled"`
-	Icon         string   `json:"icon"`
-	LoginURL     string   `json:"loginUrl"`
-	RedirectURLs []string `gorm:"serializer:json" json:"redirectUris"`
-	LogoutURLs   []string `gorm:"serializer:json" json:"postLogoutRedirectUris"`
-	Origins      []string `gorm:"serializer:json" json:"origins"`
-	LocalEnabled bool     `json:"localEnabled"`
-	ProviderIDs  []string `gorm:"-" json:"providerIds"`
-	RoleIDs      []string `gorm:"-" json:"roleIds"`
+	ID               string   `gorm:"primaryKey" json:"id"`
+	Name             string   `json:"name"`
+	ClientID         string   `gorm:"uniqueIndex;not null" json:"clientId"`
+	ClientType       string   `json:"clientType"`
+	SecretHash       string   `json:"-"`
+	Enabled          bool     `json:"enabled"`
+	Icon             string   `json:"icon"`
+	LoginURL         string   `json:"loginUrl"`
+	RedirectURLs     []string `gorm:"serializer:json" json:"redirectUris"`
+	LogoutURLs       []string `gorm:"serializer:json" json:"postLogoutRedirectUris"`
+	Origins          []string `gorm:"serializer:json" json:"origins"`
+	LocalEnabled     bool     `json:"localEnabled"`
+	AllowWithoutPKCE bool     `json:"allowWithoutPkce"`
+	ProviderIDs      []string `gorm:"-" json:"providerIds"`
+	RoleIDs          []string `gorm:"-" json:"roleIds"`
 }
 type Provider struct {
 	ID           string `gorm:"primaryKey" json:"id"`
@@ -149,6 +150,7 @@ type Event struct {
 	Kind      string `gorm:"index"`
 	Success   bool
 	RequestID string
+	Details   string
 	CreatedAt time.Time `gorm:"index"`
 }
 type SchemaVersion struct {

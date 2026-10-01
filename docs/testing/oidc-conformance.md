@@ -47,3 +47,28 @@ sh web/e2e/run.sh
 - `make compose-config COMPOSE_ENV=.env.example` validated the migrate → seed →
   app dependency chain. No container image build/start was performed for this
   change; the browser runner built and exercised the embedded Go binary.
+
+## Web PKCE compatibility (2026-09-30)
+
+- `make test-db lint` passed the full SQLite/PostgreSQL race suite and Go static
+  analysis using an isolated, temporary PostgreSQL 17 database. After the final
+  administrator-session and test changes, the dual-driver race tests were rerun
+  for `TestPKCE` and `TestCSRFAndForcedPassword` and passed.
+- New coverage includes default enforcement, SPA rejection, confidential Web
+  login without PKCE or nonce, client-secret checks, rejection of malformed or
+  downgraded PKCE, unexpected verifier rejection, replay and concurrent code
+  consumption, current access/session/policy rechecks, and existing-token
+  validity after the compatibility option is disabled.
+- Administration coverage verifies administrator-only policy changes (including
+  concurrent role revocation), Editor updates to other fields, before/after
+  audit details, rollback on audit failure, and version-one migration with data,
+  default enforcement, checksum validation and idempotence.
+- `make web-check` passed typecheck and two unit tests. `make test-e2e` passed
+  all three Chromium scenarios, including Web/SPA shared SSO, SPA hiding the
+  compatibility option, default-off state, administrator provisioning and an
+  independent coreos/go-oidc Web client completing login without PKCE.
+- The browser runner built and exercised the embedded Go binary. No Burrow
+  container image build/deployment or real Nightingale/Harbor deployment was
+  performed. Compatibility mode lowers authorization-code protection; the
+  independent Web example still verifies nonce and does not represent the
+  security behavior of Nightingale v9.1.1.

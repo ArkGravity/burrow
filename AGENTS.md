@@ -77,8 +77,10 @@ frontend with `-tags embedweb`; build `web/dist` first, normally through
 ## OIDC boundaries
 
 - Continue using `zitadel/oidc/v3` through the existing OP/RP adapters.
-- Support Authorization Code with mandatory PKCE S256. Web clients use
-  `client_secret_basic`; SPA clients use `none`.
+- Support Authorization Code with PKCE S256 required by default. Administrators
+  may allow a specific Web application to omit PKCE using `allowWithoutPkce`;
+  SPA clients always require PKCE. Submitted PKCE must always be validated and
+  must use S256. Web clients use `client_secret_basic`; SPA clients use `none`.
 - Preserve exact callback, logout and allowed-origin matching. Do not introduce
   wildcard redirects or permissive CORS.
 - Preserve browser-bound state, nonce and PKCE transactions, expiry checks and

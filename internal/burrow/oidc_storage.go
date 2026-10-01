@@ -73,6 +73,9 @@ func (a *authRequest) GetAudience() []string  { return []string{a.Request.Client
 func (a *authRequest) GetAuthTime() time.Time { return a.AuthTime }
 func (a *authRequest) GetClientID() string    { return a.Request.ClientID }
 func (a *authRequest) GetCodeChallenge() *oidc.CodeChallenge {
+	if a.Request.CodeChallenge == "" {
+		return nil
+	}
 	return &oidc.CodeChallenge{Challenge: a.Request.CodeChallenge, Method: a.Request.CodeChallengeMethod}
 }
 func (a *authRequest) GetNonce() string                   { return a.Request.Nonce }
@@ -89,9 +92,6 @@ func loadAuth(v AuthTransaction) (*authRequest, error) {
 	return a, e
 }
 func (s oidcStore) CreateAuthRequest(ctx context.Context, r *oidc.AuthRequest, _ string) (op.AuthRequest, error) {
-	if r.CodeChallengeMethod != oidc.CodeChallengeMethodS256 || len(r.CodeChallenge) != 43 {
-		return nil, oidc.ErrInvalidRequest().WithDescription("S256 PKCE required")
-	}
 	for _, scope := range r.Scopes {
 		if !contains([]string{"openid", "profile", "email"}, scope) {
 			return nil, oidc.ErrInvalidScope()
@@ -113,6 +113,9 @@ func (s oidcStore) CreateAuthRequest(ctx context.Context, r *oidc.AuthRequest, _
 	}
 	var app Application
 	if e = s.DB.Where("client_id = ? AND enabled = ?", r.ClientID, true).First(&app).Error; e != nil {
+		return nil, e
+	}
+	if e = validatePKCE(app, r); e != nil {
 		return nil, e
 	}
 	payload, e := json.Marshal(r)
@@ -175,6 +178,16 @@ func (b *Server) authorized(tx *gorm.DB, a AuthTransaction) (User, Session, erro
 	if e := tx.Where("id = ? AND enabled = ?", a.ClientID, true).First(&app).Error; e != nil {
 		return u, session, e
 	}
+	// Token-backed UserInfo checks have no authorization request payload.
+	if a.Payload != "" {
+		request, e := loadAuth(a)
+		if e != nil {
+			return u, session, e
+		}
+		if e := validatePKCE(app, &request.Request); e != nil {
+			return u, session, e
+		}
+	}
 	p, admin, e := permissions(tx, u)
 	if e != nil {
 		return u, session, e
@@ -197,6 +210,17 @@ func (b *Server) authorized(tx *gorm.DB, a AuthTransaction) (User, Session, erro
 		}
 	}
 	return u, session, nil
+}
+
+func validatePKCE(app Application, request *oidc.AuthRequest) error {
+	if request.CodeChallenge == "" && request.CodeChallengeMethod == "" && app.ClientType == "web" && app.AllowWithoutPKCE {
+		return nil
+	}
+	decoded, err := base64.RawURLEncoding.DecodeString(request.CodeChallenge)
+	if request.CodeChallengeMethod != oidc.CodeChallengeMethodS256 || err != nil || len(decoded) != 32 || base64.RawURLEncoding.EncodeToString(decoded) != request.CodeChallenge {
+		return oidc.ErrInvalidRequest().WithDescription("S256 PKCE required")
+	}
+	return nil
 }
 func (s oidcStore) CreateAccessToken(ctx context.Context, request op.TokenRequest) (string, time.Time, error) {
 	a, ok := request.(*authRequest)

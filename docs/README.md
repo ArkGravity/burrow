@@ -16,6 +16,7 @@ targets and Docker Compose deployment.
 ## Operations and verification
 
 - [Backup, recovery, upgrades and signing-key rotation](operations/recovery.md)
+- [Grafana OIDC integration and acceptance](operations/grafana.md)
 - [Protocol interoperability and regression verification](testing/oidc-conformance.md)
 - [CI workflow](../.github/workflows/ci.yml)
 

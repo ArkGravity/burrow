@@ -90,23 +90,28 @@ func (s *Store) Migrate() error {
 		if err := tx.First(&v, 1).Error; err != nil {
 			return err
 		}
-		if v.Version > 1 {
+		migrations := []string{initialMigration, pkceCompatibilityMigration}
+		if v.Version > len(migrations) {
 			return errors.New("database schema is newer than binary")
 		}
-		if v.Version == 1 {
-			if v.Checksum != hash(initialMigration) {
+		if v.Version > 0 {
+			if v.Checksum != migrationChecksum(v.Version) {
 				return errors.New("migration checksum mismatch")
 			}
-			return nil
 		}
-		for _, statement := range strings.Split(initialMigration, ";") {
-			if strings.TrimSpace(statement) != "" {
-				if err := tx.Exec(statement).Error; err != nil {
-					return err
+		for version := v.Version; version < len(migrations); version++ {
+			for _, statement := range strings.Split(migrations[version], ";") {
+				if strings.TrimSpace(statement) != "" {
+					if err := tx.Exec(statement).Error; err != nil {
+						return err
+					}
 				}
 			}
+			if err := tx.Model(&v).Updates(map[string]any{"version": version + 1, "checksum": migrationChecksum(version + 1)}).Error; err != nil {
+				return err
+			}
 		}
-		return tx.Model(&v).Updates(map[string]any{"version": 1, "checksum": hash(initialMigration)}).Error
+		return nil
 	})
 }
 func (s *Store) Health(ctx context.Context) error {
@@ -114,7 +119,7 @@ func (s *Store) Health(ctx context.Context) error {
 	if err := s.DB.WithContext(ctx).First(&v, 1).Error; err != nil {
 		return err
 	}
-	if v.Version != 1 || v.Checksum != hash(initialMigration) {
+	if v.Version != 2 || v.Checksum != migrationChecksum(2) {
 		return errors.New("migration required")
 	}
 	return nil
@@ -248,6 +253,16 @@ func invalid(field string) error { return fmt.Errorf("invalid_%s", field) }
 
 //go:embed migrations/001_initial.sql
 var initialMigration string
+
+//go:embed migrations/002_pkce_compatibility.sql
+var pkceCompatibilityMigration string
+
+func migrationChecksum(version int) string {
+	if version == 1 {
+		return hash(initialMigration)
+	}
+	return hash(initialMigration + pkceCompatibilityMigration)
+}
 
 func (c *Config) defaults() {
 	f := configDefaults()

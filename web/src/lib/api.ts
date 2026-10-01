@@ -9,6 +9,7 @@ export interface User {
 }
 export interface Session {
   user: User;
+  administrator: boolean;
   permissions: string[];
   redirect?: string;
 }

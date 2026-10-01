@@ -181,15 +181,22 @@ the default roles cannot be assigned blanket APP login permissions. The Users
 list shows group names so administrators can inspect membership directly.
 See [seed and default roles](docs/development/seed.md).
 
-| Capability            | Supported behavior                                                               |
-| --------------------- | -------------------------------------------------------------------------------- |
-| Discovery             | `<issuer>/.well-known/openid-configuration`                                      |
-| Flow                  | Authorization Code + mandatory PKCE S256                                         |
-| Client authentication | Web: `client_secret_basic`; SPA: `none`                                          |
-| Scopes                | `openid profile email`                                                           |
-| ID Token signing      | RS256, public keys through JWKS                                                  |
-| Endpoints             | `/oidc/authorize`, `/oidc/token`, `/oidc/userinfo`, `/oidc/jwks`, `/oidc/logout` |
-| Sessions              | Shared Burrow SSO; APP sessions remain under APP control                         |
+| Capability            | Supported behavior                                                                 |
+| --------------------- | ---------------------------------------------------------------------------------- |
+| Discovery             | `<issuer>/.well-known/openid-configuration`                                        |
+| Flow                  | Authorization Code + PKCE S256 by default; administrator-controlled Web exceptions |
+| Client authentication | Web: `client_secret_basic`; SPA: `none`                                            |
+| Scopes                | `openid profile email`                                                             |
+| ID Token signing      | RS256, public keys through JWKS                                                    |
+| Endpoints             | `/oidc/authorize`, `/oidc/token`, `/oidc/userinfo`, `/oidc/jwks`, `/oidc/logout`   |
+| Sessions              | Shared Burrow SSO; APP sessions remain under APP control                           |
+
+Administrators may enable **Allow login without PKCE** for an individual Web
+application (`allowWithoutPkce`, default `false`). SPA clients always require
+S256; supplied PKCE is always validated. This compatibility setting reduces
+authorization code protection. Disabling it blocks outstanding codes issued
+without PKCE, while existing tokens and APP sessions retain their normal
+lifecycle. Run `make migrate` before starting an upgraded server.
 
 Access Tokens are for Burrow UserInfo. Refresh Tokens, implicit flow, machine
 clients, dynamic registration and cross-application logout are outside the

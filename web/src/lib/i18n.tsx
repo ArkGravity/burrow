@@ -79,6 +79,9 @@ const en = {
   passwordHint: "Use at least 12 characters",
   clientId: "Client ID",
   clientType: "Client type",
+  allowWithoutPkce: "Allow login without PKCE",
+  allowWithoutPkceHint:
+    "For server applications that do not support PKCE. Reduces authorization code protection. Only administrators can change this setting.",
   webClient: "Server-side web",
   spaClient: "Browser SPA",
   clientSecret: "Client secret",
@@ -204,6 +207,9 @@ const zh: Record<Key, string> = {
   passwordHint: "请使用至少 12 位字符",
   clientId: "客户端 ID",
   clientType: "客户端类型",
+  allowWithoutPkce: "允许不使用 PKCE 登录",
+  allowWithoutPkceHint:
+    "用于兼容不支持 PKCE 的服务端应用，会降低授权码保护。仅管理员可修改此设置。",
   webClient: "服务端 Web",
   spaClient: "浏览器 SPA",
   clientSecret: "客户端密钥",

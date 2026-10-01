@@ -124,6 +124,7 @@ const definitions: Record<
         type: "urls",
       },
       { key: "origins", label: "origins", type: "urls" },
+      { key: "allowWithoutPkce", label: "allowWithoutPkce", type: "switch" },
       { key: "localEnabled", label: "localEnabled", type: "switch" },
       {
         key: "providerIds",
@@ -165,9 +166,11 @@ export function Resources({ resource }: { resource: string }) {
   const [passwordUser, setPasswordUser] = useState<Row>();
   const [identityUser, setIdentityUser] = useState<Row>();
   const [form] = Form.useForm();
+  const clientType = Form.useWatch("clientType", form);
   const [passwordForm] = Form.useForm();
   const writable = can(session?.permissions || [], def.permission);
   const authWritable = can(session?.permissions || [], "authorization:write");
+  const administrator = session?.administrator === true;
   const load = useCallback(async () => {
     setLoading(true);
     setError("");
@@ -204,6 +207,7 @@ export function Resources({ resource }: { resource: string }) {
             enabled: true,
             localEnabled: true,
             clientType: "web",
+            allowWithoutPkce: false,
             ...(resource === "users" ? { roleIds: ["viewer"] } : {}),
           },
     );
@@ -248,6 +252,10 @@ export function Resources({ resource }: { resource: string }) {
           delete values[key];
       }
       if (values.clientSecret === "") delete values.clientSecret;
+      if (resource === "applications") {
+        if (!administrator) delete values.allowWithoutPkce;
+        else if (values.clientType === "spa") values.allowWithoutPkce = false;
+      }
       const result = await write<Row>(
         `/${resource}${editing ? "/" + editing.id : ""}`,
         values,
@@ -504,7 +512,11 @@ export function Resources({ resource }: { resource: string }) {
           onFinish={submit}
         >
           {def.fields
-            .filter((f) => !f.createOnly || !editing)
+            .filter(
+              (f) =>
+                (!f.createOnly || !editing) &&
+                (f.key !== "allowWithoutPkce" || clientType === "web"),
+            )
             .map((field) => {
               const restricted =
                 ["roleIds", "groupIds", "userIds", "permissionIds"].includes(
@@ -525,10 +537,20 @@ export function Resources({ resource }: { resource: string }) {
                       ? [{ type: "email" as const, message: t("invalidEmail") }]
                       : []),
                   ]}
-                  extra={field.type === "urls" ? t("linesHint") : undefined}
+                  extra={
+                    field.key === "allowWithoutPkce"
+                      ? t("allowWithoutPkceHint")
+                      : field.type === "urls"
+                        ? t("linesHint")
+                        : undefined
+                  }
                 >
                   {field.type === "switch" ? (
-                    <Switch />
+                    <Switch
+                      disabled={
+                        field.key === "allowWithoutPkce" && !administrator
+                      }
+                    />
                   ) : field.type === "password" ? (
                     <Input.Password autoComplete="new-password" />
                   ) : field.type === "urls" ? (

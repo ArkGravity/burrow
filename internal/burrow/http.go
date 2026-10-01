@@ -224,14 +224,15 @@ func (b *Server) require(w http.ResponseWriter, r *http.Request, permission stri
 	return u, s, true
 }
 func (b *Server) meResult(u User) (map[string]any, error) {
-	p, _, err := permissions(b.DB, u)
+	p, administrator, err := permissions(b.DB, u)
 	if err != nil {
 		return nil, err
 	}
 	if u.MustChangePassword {
 		p = []string{}
+		administrator = false
 	}
-	return map[string]any{"user": u, "permissions": p}, nil
+	return map[string]any{"user": u, "permissions": p, "administrator": administrator}, nil
 }
 func (b *Server) me(w http.ResponseWriter, r *http.Request) {
 	u, _, ok := b.require(w, r, "")

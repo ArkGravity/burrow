@@ -2,6 +2,15 @@ import { expect, test } from "@playwright/test";
 import { spawn } from "node:child_process";
 import { resolve } from "node:path";
 
+async function stop(child: ReturnType<typeof spawn>) {
+  if (child.exitCode !== null || child.signalCode !== null) return;
+  const stopped = new Promise<void>((resolve) =>
+    child.once("exit", () => resolve()),
+  );
+  child.kill();
+  await stopped;
+}
+
 test("administrator provisions access and ordinary users see only their portal", async ({
   page,
   browser,
@@ -72,6 +81,9 @@ test("administrator provisions access and ordinary users see only their portal",
   await page
     .getByRole("combobox", { name: "Permissions", exact: true })
     .click();
+  await page
+    .getByRole("combobox", { name: "Permissions", exact: true })
+    .fill("app:");
   await page
     .locator(".ant-select-item-option")
     .filter({ hasText: /app:.*:login/ })
@@ -264,7 +276,95 @@ test("independent Web and SPA OIDC clients share SSO and complete RP logout", as
     await expect(page).toHaveURL(/localhost:19002/);
     expect((await page.request.get(issuer + "/api/v1/me")).status()).toBe(401);
   } finally {
-    webChild.kill();
-    spaChild.kill();
+    await Promise.all([stop(webChild), stop(spaChild)]);
+  }
+});
+
+test("administrator enables PKCE compatibility for an independent Web client", async ({
+  page,
+  request,
+}) => {
+  test.setTimeout(60000);
+  await page.goto("/login");
+  await page.getByLabel("Username", { exact: true }).fill("admin");
+  await page
+    .getByLabel("Password", { exact: true })
+    .fill("Changed-admin-password-2026");
+  await page.getByRole("button", { name: "Sign in", exact: true }).click();
+  await expect(
+    page.getByRole("heading", { name: "Your workspace, connected." }),
+  ).toBeVisible();
+  await page.getByRole("link", { name: "Applications", exact: true }).click();
+  await page.getByRole("button", { name: "Create", exact: true }).click();
+  await page.getByLabel("Name", { exact: true }).fill("Legacy Web interop");
+  await page
+    .getByLabel("Application login URL", { exact: true })
+    .fill("http://localhost:19001/login");
+  await page
+    .getByLabel("Redirect URIs", { exact: true })
+    .fill("http://localhost:19001/callback");
+  const compatibility = page.getByRole("switch", {
+    name: "Allow login without PKCE",
+    exact: true,
+  });
+  await expect(compatibility).not.toBeChecked();
+  await page.getByLabel("Client type", { exact: true }).click();
+  await page
+    .locator(".ant-select-item-option")
+    .filter({ hasText: "Browser SPA" })
+    .click();
+  await expect(compatibility).not.toBeVisible();
+  await page.getByLabel("Client type", { exact: true }).click();
+  await page
+    .locator(".ant-select-item-option")
+    .filter({ hasText: "Server-side web" })
+    .click();
+  await compatibility.check();
+  await page.getByRole("button", { name: "Save changes", exact: true }).click();
+  await expect(page.getByText("Save this secret now")).toBeVisible();
+  const secret = (await page.locator(".secret-value").innerText()).trim();
+  await page.getByRole("button", { name: "Close", exact: true }).last().click();
+  const apps = await (await page.request.get("/api/v1/applications")).json();
+  const app = apps.items.find(
+    (row: { name: string }) => row.name === "Legacy Web interop",
+  );
+  expect(app.allowWithoutPkce).toBe(true);
+  const issuer = process.env.BURROW_E2E_URL || "http://localhost:18080";
+  const child = spawn(process.env.BURROW_E2E_WEB_BINARY!, [], {
+    env: {
+      ...process.env,
+      OIDC_ISSUER: issuer,
+      OIDC_CLIENT_ID: app.clientId,
+      OIDC_CLIENT_SECRET: secret,
+      OIDC_USE_PKCE: "false",
+    },
+    stdio: "ignore",
+  });
+  try {
+    await expect
+      .poll(async () => {
+        try {
+          return (await request.get("http://localhost:19001/")).status();
+        } catch {
+          return 0;
+        }
+      })
+      .toBe(200);
+    const authorization = page.waitForRequest((r) =>
+      r.url().startsWith(issuer + "/oidc/authorize?"),
+    );
+    await page.goto("http://localhost:19001/login");
+    const params = new URL((await authorization).url()).searchParams;
+    expect(params.has("code_challenge")).toBe(false);
+    expect(params.has("code_challenge_method")).toBe(false);
+    await expect(page).toHaveURL(/localhost:19001\/callback/);
+    await expect(page.locator("body")).toContainText(
+      "OIDC code without PKCE verified with coreos/go-oidc",
+    );
+    await expect(page.locator("body")).toContainText(
+      '"preferred_username":"admin"',
+    );
+  } finally {
+    await stop(child);
   }
 });

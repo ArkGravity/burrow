@@ -190,7 +190,7 @@ func (b *Server) mutate(w http.ResponseWriter, r *http.Request, resource string)
 		"users":        {"username", "name", "email", "enabled", "localEnabled", "mustChangePassword", "language", "theme", "password", "roleIds", "groupIds"},
 		"groups":       {"name", "description", "userIds", "roleIds"},
 		"roles":        {"name", "description", "permissionIds"},
-		"applications": {"name", "clientId", "clientType", "enabled", "icon", "loginUrl", "redirectUris", "postLogoutRedirectUris", "origins", "localEnabled", "providerIds", "roleIds"},
+		"applications": {"name", "clientId", "clientType", "enabled", "icon", "loginUrl", "redirectUris", "postLogoutRedirectUris", "origins", "localEnabled", "allowWithoutPkce", "providerIds", "roleIds"},
 		"providers":    {"name", "issuer", "clientId", "clientSecret", "enabled"},
 	}
 	for k := range in {
@@ -211,6 +211,7 @@ func (b *Server) mutate(w http.ResponseWriter, r *http.Request, resource string)
 		}
 	}
 	var result any
+	auditDetails := ""
 	secret := ""
 	b.mu.Lock()
 	e = b.DB.Transaction(func(tx *gorm.DB) error {
@@ -358,11 +359,31 @@ func (b *Server) mutate(w http.ResponseWriter, r *http.Request, resource string)
 			}
 			oldClient := v.ClientID
 			oldType := v.ClientType
+			oldAllowWithoutPKCE := v.AllowWithoutPKCE
+			if raw, present := in["allowWithoutPkce"]; present {
+				var value bool
+				if string(raw) == "null" || json.Unmarshal(raw, &value) != nil {
+					return invalid("allow_without_pkce")
+				}
+			}
 			if err := json.Unmarshal(data, &v); err != nil {
 				return invalid("request")
 			}
 			if !creating && (v.ClientID != oldClient || v.ClientType != oldType) {
 				return invalid("immutable_client")
+			}
+			if v.AllowWithoutPKCE != oldAllowWithoutPKCE && !admin {
+				return errors.New("forbidden")
+			}
+			if v.AllowWithoutPKCE && v.ClientType != "web" {
+				return invalid("allow_without_pkce")
+			}
+			if v.AllowWithoutPKCE != oldAllowWithoutPKCE {
+				details, err := json.Marshal(map[string]any{"allowWithoutPkce": map[string]bool{"before": oldAllowWithoutPKCE, "after": v.AllowWithoutPKCE}})
+				if err != nil {
+					return err
+				}
+				auditDetails = string(details)
 			}
 			if v.Name == "" || v.ClientID == "" || !contains([]string{"web", "spa"}, v.ClientType) || len(v.RedirectURLs) == 0 {
 				return invalid("application")
@@ -438,7 +459,7 @@ func (b *Server) mutate(w http.ResponseWriter, r *http.Request, resource string)
 		if e := localAdminExists(tx); e != nil {
 			return e
 		}
-		return tx.Create(&Event{ID: random(18), ActorID: actor.ID, ObjectID: id, Kind: resource + ":" + strings.ToLower(r.Method), RequestID: requestID(r), Success: true, CreatedAt: time.Now()}).Error
+		return tx.Create(&Event{ID: random(18), ActorID: actor.ID, ObjectID: id, Kind: resource + ":" + strings.ToLower(r.Method), RequestID: requestID(r), Details: auditDetails, Success: true, CreatedAt: time.Now()}).Error
 	})
 	b.mu.Unlock()
 	if e != nil {

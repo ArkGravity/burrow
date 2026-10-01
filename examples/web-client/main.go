@@ -36,6 +36,7 @@ func main() {
 		issuer = "http://localhost:8080"
 	}
 	id, secret := os.Getenv("OIDC_CLIENT_ID"), os.Getenv("OIDC_CLIENT_SECRET")
+	usePKCE := os.Getenv("OIDC_USE_PKCE") != "false"
 	if id == "" || secret == "" {
 		log.Fatal("set OIDC_CLIENT_ID and OIDC_CLIENT_SECRET")
 	}
@@ -62,7 +63,11 @@ func main() {
 		flows[state] = pending{nonce, pkce, time.Now().Add(5 * time.Minute)}
 		mu.Unlock()
 		http.SetCookie(w, &http.Cookie{Name: "example_flow", Value: state, Path: "/", HttpOnly: true, SameSite: http.SameSiteLaxMode, MaxAge: 300})
-		http.Redirect(w, r, config.AuthCodeURL(state, oidc.Nonce(nonce), oauth2.S256ChallengeOption(pkce)), http.StatusFound)
+		options := []oauth2.AuthCodeOption{oidc.Nonce(nonce)}
+		if usePKCE {
+			options = append(options, oauth2.S256ChallengeOption(pkce))
+		}
+		http.Redirect(w, r, config.AuthCodeURL(state, options...), http.StatusFound)
 	})
 	mux.HandleFunc("/callback", func(w http.ResponseWriter, r *http.Request) {
 		state := r.URL.Query().Get("state")
@@ -80,7 +85,11 @@ func main() {
 			return
 		}
 		http.SetCookie(w, &http.Cookie{Name: "example_flow", Value: "", Path: "/", HttpOnly: true, MaxAge: -1})
-		tokens, e := config.Exchange(ctx, r.URL.Query().Get("code"), oauth2.VerifierOption(flow.Verifier))
+		var options []oauth2.AuthCodeOption
+		if usePKCE {
+			options = append(options, oauth2.VerifierOption(flow.Verifier))
+		}
+		tokens, e := config.Exchange(ctx, r.URL.Query().Get("code"), options...)
 		if e != nil {
 			http.Error(w, "exchange failed", 400)
 			return
@@ -106,7 +115,11 @@ func main() {
 		}
 		w.Header().Set("Content-Type", "application/json")
 		w.Header().Set("Cache-Control", "no-store")
-		json.NewEncoder(w).Encode(map[string]any{"message": "OIDC code + PKCE verified with coreos/go-oidc", "claims": claims})
+		message := "OIDC code + PKCE verified with coreos/go-oidc"
+		if !usePKCE {
+			message = "OIDC code without PKCE verified with coreos/go-oidc"
+		}
+		json.NewEncoder(w).Encode(map[string]any{"message": message, "claims": claims})
 	})
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
