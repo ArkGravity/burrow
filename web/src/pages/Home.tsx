@@ -118,6 +118,7 @@ export function HomePage() {
                   className="app-card"
                   key={app.id}
                   href={String(app.loginUrl)}
+                  target="_blank"
                   rel="noopener noreferrer"
                 >
                   <div className="app-icon">
