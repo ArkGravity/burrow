@@ -17,7 +17,7 @@ targets and Docker Compose deployment.
 
 - [Backup, recovery, upgrades and signing-key rotation](operations/recovery.md)
 - [Grafana OIDC integration and acceptance](operations/grafana.md)
-- [Local Docker Burrow, Grafana and Nginx example](../examples/local-sso/README.md)
+- [Local Docker Burrow, Grafana, Nightingale, Harbor and Nginx example](../examples/local-sso/README.md)
 - [Protocol interoperability and regression verification](testing/oidc-conformance.md)
 - [CI workflow](../.github/workflows/ci.yml)
 

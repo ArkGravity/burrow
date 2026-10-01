@@ -1,0 +1,26 @@
+# Public development settings for the official Harbor 2.15.2 prepare image.
+# deploy.py expands these two path markers into ignored local directories.
+hostname: harbor.yakir.top
+http:
+  port: 80
+external_url: http://harbor.yakir.top
+harbor_admin_password: Harbor-development-admin-2026
+database:
+  password: Harbor-development-database-2026
+  max_idle_conns: 10
+  max_open_conns: 30
+data_volume: __DATA_DIR__
+jobservice:
+  max_job_workers: 2
+  job_loggers: [STD_OUTPUT, FILE]
+  logger_sweeper_duration: 1
+notification:
+  webhook_job_max_retry: 3
+  webhook_job_http_client_timeout: 3
+log:
+  level: warning
+  local:
+    rotate_count: 3
+    rotate_size: 20M
+    location: __LOG_DIR__
+_version: 2.15.0

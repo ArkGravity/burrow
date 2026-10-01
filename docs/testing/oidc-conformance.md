@@ -96,6 +96,129 @@ sh web/e2e/run.sh
   display name and granting ordinary-user portal access through a group role.
 - The Burrow Docker image was built. The independent local SSO Compose was
   reset at the user's request and started with fresh SQLite/Grafana volumes.
-  Applications remain manually configured; full Grafana login after this reset
-  and production deployment have not been verified. This is local engineering
+  Applications remain manually configured. The user subsequently reported that
+  the ordinary `logic` user successfully logged into Grafana through Burrow OIDC;
+  this is user-reported acceptance, not a repeated automated browser check.
+  Production deployment has not been verified. This is local engineering
   validation, not official OIDC certification.
+
+## Local Nightingale example checkpoint (2026-10-01)
+
+- Added Nightingale `9.1.1` to the independent `examples/local-sso` Compose with
+  persistent SQLite data, in-process miniredis and Nginx routing for
+  `n9e.yakir.top`. Existing Burrow/Grafana containers and data were retained;
+  the root deployment Compose was unchanged.
+- Verified upstream source: runtime `config.toml` does not initialize OIDC.
+  The current example documents manual OIDC TOML entry in Nightingale's UI,
+  without direct database writes or automatic Burrow application creation.
+- Quiet Compose validation, Nginx configuration validation, formatting and
+  `git diff --check` passed. All four persistent services were healthy, and the
+  original one-shot SSO initialization exited successfully (that initialization
+  service and script have since been removed). A repeated import skipped the
+  unchanged configuration. After restarting Nightingale, its login-button
+  configuration persisted and its generated authorization request had the
+  expected issuer, Client ID, exact callback, scopes and no PKCE challenge.
+  The proxied Nightingale homepage returned HTTP 200.
+- The user subsequently reported that `logic` successfully logged into
+  Nightingale by clicking "Sign in with Burrow" on its login page. This is
+  user-reported acceptance, not a repeated automated browser check. The portal
+  still opens Nightingale's root URL, which does not initiate OIDC automatically
+  in the deployed frontend. The user accepted this behavior and deferred both
+  automatic-entry approaches. The README now includes the standalone TOML and
+  manual OIDC UI steps, distinct from the mounted runtime `config.toml`.
+  No product unit/race suite or browser regression was run for this example.
+
+## Local Harbor example checkpoint (2026-10-01)
+
+- Added Harbor `v2.15.2` using its official prepare image and nine base service
+  images, without Trivy/exporter. The separate `burrow-local-sso-harbor` Compose
+  project joins the existing SSO network through core and proxy; the existing
+  Nginx serves `harbor.yakir.top`. Existing Burrow/Grafana/Nightingale containers
+  and data were retained; only Nginx was recreated. The root deployment Compose
+  remains unchanged. Official amd64 images ran under emulation on this arm64
+  Docker host (four CPUs, approximately 6 GiB memory).
+- The current deployment helper only generates internal service configuration
+  and merges the network overlay. Harbor OIDC settings are maintained manually
+  in its UI, using the README example. `harbor.yml` supplies deployment settings,
+  not OIDC parameters; Burrow Applications are also created manually.
+- Successfully generated official configuration, pulled and started all nine
+  healthy services, and checked the proxied homepage (HTTP 200) and Harbor health
+  API (all components healthy). The actual OIDC login route returned HTTP 302 to
+  Burrow with the expected Client ID, exact public callback, only
+  `openid profile email`, and an S256 challenge. No PKCE exception is needed.
+- During the original deployment, switching between startup overrides and UI
+  maintenance verified persistence and editability. Startup overrides and the
+  mode-switch option have since been removed; the helper now always uses UI
+  maintenance. The README documents manual OIDC and Burrow application/role setup.
+- Generated service configuration, internal keys, database and logs are ignored
+  local data. Outer and generated Harbor proxy access logs are disabled to avoid
+  recording authorization-code callback URLs. Quiet Compose validation, Nginx
+  configuration validation, formatting and `git diff --check` passed.
+- The user subsequently confirmed Harbor's OIDC web-login acceptance, together
+  with Grafana and Nightingale; see the final acceptance checkpoint below.
+  No product unit/race suite, automated
+  browser regression, production deployment or Docker/Helm CLI authentication
+  was performed for this example. This is local engineering validation, not
+  official OIDC certification.
+
+## Manual SSO configuration cleanup (2026-10-01)
+
+- At the user's request, Nightingale and Harbor now use manual SSO configuration
+  in their own UIs, with complete examples in the local SSO README. Removed the
+  Nightingale one-shot service, API import script and standalone OIDC file, and
+  removed Harbor's OIDC Compose overlay and deployment mode argument. The Harbor
+  helper retains official deployment preparation and network configuration only.
+- Removed the exited Nightingale initialization container. Recreated Harbor core
+  without its startup configuration override; existing OIDC settings persisted
+  and were editable. Burrow, Grafana and Nightingale containers and all existing
+  databases were preserved. No fresh database or manual UI save was exercised in
+  this cleanup. The user subsequently confirmed all three integrations passed.
+- Harbor jobservice was unhealthy during verification and was restarted. The
+  subsequent homepage and aggregate health API checks passed, all nine Harbor
+  containers and the existing SSO services were healthy, and the actual OIDC
+  redirect retained its exact callback, expected scopes and S256 challenge.
+- Quiet validation passed for both Compose projects; the base service list no
+  longer contains a Nightingale SSO initializer. Python syntax, README TOML and
+  local file links, formatting and `git diff --check` passed. `git check-ignore`
+  verified Harbor data, logs and runtime directories; a local rule also ignores
+  Python bytecode caches. No generated data was staged or deleted. The root
+  deployment Compose remains unchanged. No product test suite or browser
+  regression was rerun for this example cleanup.
+
+## Local SSO file layout cleanup (2026-10-01)
+
+- Moved Nightingale's runtime configuration to `examples/local-sso/n9e.config.toml`
+  and removed the empty `nightingale/` directory. Updated the Compose bind mount
+  and README. Recreated only Nightingale; it became healthy, its mount references
+  the new file and its original named data volume remains attached.
+- During that cleanup, a check for the original OIDC button text failed because the
+  then-current persisted
+  OIDC record has `Enable=false`. Read-only inspection confirmed the record still
+  exists and its update time predates this recreation. No SSO setting was changed
+  or automatically enabled during this cleanup.
+- Reviewed Harbor's files: its generated runtime Compose contains the nine base
+  service definitions, while the maintained overlay changes local platform,
+  names, networks and ports. Renamed the overlay to `docker-compose.override.yml`
+  and updated the helper. The README explains each maintained/generated file and
+  why the two Compose layers belong to one deployment. Harbor was not recreated.
+- Both quiet Compose validations, Python/TOML syntax, README local links,
+  formatting and `git diff --check` passed. No product suite or browser regression
+  was rerun; existing data and root deployment Compose were preserved.
+
+## Grafana, Nightingale and Harbor acceptance (2026-10-01)
+
+- The user confirmed that Grafana, Nightingale and Harbor all passed local OIDC
+  web-login acceptance through Burrow. This supersedes the earlier pending Harbor
+  acceptance and the temporary Nightingale disabled-configuration observation;
+  no current database setting was read or modified to record this report.
+- The final independent example uses Burrow dev SQLite and Nginx, Nightingale's
+  flat `n9e.config.toml` runtime file, and Harbor's official prepare output plus
+  local Compose overrides. Applications and login-role assignments are maintained
+  in Burrow's UI; Nightingale and Harbor OIDC settings are maintained in their UIs.
+- Grafana and Harbor keep S256 PKCE enforcement; Nightingale v9.1.1 uses only its
+  per-Web-application exception. The accepted Nightingale portal behavior still
+  allows an additional SSO button click. Harbor acceptance covers web login only.
+- This is user-reported acceptance, not a repeated automated browser run or a
+  claim that every negative-access scenario in the example was executed. Production
+  deployment, Docker/Helm CLI authentication and official certification remain
+  outside this checkpoint. Earlier engineering checks above remain historical.

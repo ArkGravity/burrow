@@ -1,0 +1,8 @@
+# Generated Harbor configuration, persistent data and logs.
+/harbor/runtime/
+/harbor/data/
+/harbor/logs/
+
+# Python bytecode from local deployment helpers.
+__pycache__/
+*.pyc

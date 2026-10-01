@@ -14,7 +14,8 @@ application configuration and upstream OIDC providers.
   Redis, queues or deployment components without a concrete requirement.
 - Support English and Simplified Chinese, and light, dark and system themes.
 - Use PostgreSQL in production and support SQLite for development and tests.
-- Keep deployment configuration in the root `docker-compose.yml`.
+- Keep production deployment configuration in the root `docker-compose.yml`.
+  Standalone local integration examples belong under `examples/`.
 - Do not add protocols, grants or account-provisioning features beyond the agreed
   OIDC scope unless explicitly requested.
 
@@ -175,6 +176,33 @@ when using local overrides. Inspect `make help` for available actions.
   backend and do not expose implementation details in product flows.
 - Keep fixes scoped, preserve unrelated user edits, and synchronize README,
   configuration references and operational guides when behavior changes.
+
+## Local SSO integrations
+
+- The user reported successful local OIDC web-login acceptance for Grafana,
+  Nightingale and Harbor on 2026-10-01. Keep this user-reported checkpoint distinct
+  from automated checks, production validation and official OIDC certification.
+- Maintain the independent `examples/local-sso` deployment without changing the
+  root Compose or clearing existing databases. Burrow uses dev SQLite; Grafana,
+  Nightingale and Harbor are reached through the example Nginx.
+- Create downstream Applications manually in Burrow and grant login permissions
+  through ordinary roles assigned to users or groups. Providers represent upstream
+  identity sources and are not used to configure these downstream applications.
+- Grafana and Harbor retain PKCE S256 enforcement. Only the Nightingale v9.1.1
+  Web application uses `allowWithoutPkce`; this exception must not become global.
+- Configure Nightingale and Harbor OIDC manually in their own UIs using the
+  README examples. Do not restore automatic SSO import services or OIDC environment
+  overrides. `n9e.config.toml` supplies runtime settings, not Nightingale SSO.
+- Harbor's helper uses the official prepare image, then merges generated
+  `runtime/docker-compose.yml` with maintained `docker-compose.override.yml`.
+  Maintain deployment settings in `harbor.yml`; preserve generated internal keys
+  and database data. The parent example `.gitignore` excludes Harbor runtime,
+  data, logs and Python caches. Never stage those local artifacts.
+- Nightingale's root portal URL may require clicking its SSO button; the user
+  accepted this behavior and deferred automatic-entry changes. Harbor acceptance
+  covers its web UI, not Docker/Helm CLI authentication or project provisioning.
+- See [local SSO setup and UI configuration](examples/local-sso/README.md) and
+  [verification checkpoints](docs/testing/oidc-conformance.md) for current details.
 
 ## Codex and project memory
 

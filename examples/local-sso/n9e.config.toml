@@ -1,0 +1,44 @@
+# Runtime configuration for Nightingale (n9e) 9.1.1. OIDC is stored separately in
+# Nightingale's sso_config table; adding [OIDC] here does not enable SSO.
+[Global]
+RunMode = "release"
+
+[Log]
+Dir = "/data/logs"
+# Upstream OIDC success logs include ID tokens at INFO; keep this example quiet.
+Level = "WARNING"
+Output = "stdout"
+
+[HTTP]
+Host = "0.0.0.0"
+Port = 17000
+PrintAccessLog = false
+PProf = false
+ExposeMetrics = false
+
+[HTTP.JWTAuth]
+AccessExpired = 1500
+RefreshExpired = 10080
+RedisKeyPrefix = "/jwt/"
+
+[DB]
+DBType = "sqlite"
+DSN = "/data/n9e.db"
+MaxOpenConns = 1
+MaxIdleConns = 1
+
+[Redis]
+RedisType = "miniredis"
+
+[Center]
+MetricsYamlFile = "./etc/metrics.yaml"
+
+[Center.AnonymousAccess]
+PromQuerier = false
+AlertDetail = false
+
+[EmbeddedTSDB]
+Enable = false
+
+[Ibex]
+Enable = false
