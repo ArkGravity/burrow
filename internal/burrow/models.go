@@ -36,10 +36,16 @@ type Role struct {
 	PermissionIDs []string `gorm:"-" json:"permissionIds"`
 }
 type Permission struct {
-	ID            string `gorm:"primaryKey" json:"id"`
-	Name          string `gorm:"uniqueIndex;not null" json:"name"`
-	Description   string `json:"description"`
-	ApplicationID string `json:"applicationId"`
+	ID            string          `gorm:"primaryKey" json:"id"`
+	Name          string          `gorm:"uniqueIndex;not null" json:"name"`
+	Description   string          `json:"description"`
+	ApplicationID string          `json:"applicationId"`
+	Application   *ApplicationRef `gorm:"-" json:"application,omitempty"`
+}
+type ApplicationRef struct {
+	ID       string `json:"id"`
+	Name     string `json:"name"`
+	ClientID string `json:"clientId"`
 }
 type UserRole struct {
 	UserID string `gorm:"primaryKey"`

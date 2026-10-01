@@ -1,0 +1,119 @@
+name: burrow-local-sso
+
+x-burrow: &burrow
+  image: burrow:local-sso
+  build:
+    context: ../..
+    dockerfile: Dockerfile
+  environment:
+    BURROW_ENV: dev
+    BURROW_LISTEN_ADDR: :8080
+    BURROW_ISSUER: http://sso.yakir.top
+    BURROW_DB_DRIVER: sqlite
+    BURROW_DB_DSN: /data/burrow.db
+    # Public examples for this isolated development database only.
+    BURROW_MASTER_KEY: MDEyMzQ1Njc4OTAxMjM0NTY3ODkwMTIzNDU2Nzg5MDE=
+    BURROW_BOOTSTRAP_ADMIN_USERNAME: admin
+    BURROW_BOOTSTRAP_ADMIN_NAME: Administrator
+    BURROW_BOOTSTRAP_ADMIN_EMAIL: admin@example.test
+    BURROW_BOOTSTRAP_ADMIN_PASSWORD: Burrow-development-admin-2026
+  volumes:
+    - burrow-data:/data
+  read_only: true
+  tmpfs:
+    - /tmp
+  security_opt:
+    - no-new-privileges:true
+  cap_drop:
+    - ALL
+
+services:
+  volume-init:
+    image: burrow:local-sso
+    build:
+      context: ../..
+      dockerfile: Dockerfile
+    user: "0:0"
+    entrypoint: [/bin/sh, -c]
+    command: ["chown 65532:65532 /data"]
+    volumes:
+      - burrow-data:/data
+    read_only: true
+    cap_drop: [ALL]
+    cap_add: [CHOWN]
+    security_opt:
+      - no-new-privileges:true
+    restart: "no"
+    healthcheck:
+      disable: true
+  migrate:
+    <<: *burrow
+    command: [migrate]
+    depends_on:
+      volume-init:
+        condition: service_completed_successfully
+    restart: "no"
+    healthcheck:
+      disable: true
+  seed:
+    <<: *burrow
+    command: [seed]
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    restart: "no"
+    healthcheck:
+      disable: true
+  burrow:
+    <<: *burrow
+    command: [serve]
+    depends_on:
+      seed:
+        condition: service_completed_successfully
+    restart: unless-stopped
+    healthcheck:
+      test: [CMD, burrow, healthcheck]
+      interval: 5s
+      timeout: 3s
+      start_period: 15s
+      retries: 10
+  grafana:
+    image: grafana/grafana:13.2.3
+    volumes:
+      - ./grafana.ini:/etc/grafana/grafana.ini:ro
+      - grafana-data:/var/lib/grafana
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test: [CMD, wget, -q, -O, /dev/null, http://127.0.0.1:3000/api/health]
+      interval: 5s
+      timeout: 3s
+      start_period: 20s
+      retries: 15
+  nginx:
+    image: nginx:1.30.5-alpine
+    ports:
+      - "127.0.0.1:80:80"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      burrow:
+        condition: service_healthy
+      grafana:
+        condition: service_healthy
+    networks:
+      default:
+        aliases:
+          - sso.yakir.top
+          - grafana.yakir.top
+    restart: unless-stopped
+    healthcheck:
+      test: [CMD, wget, -q, -O, /dev/null, http://127.0.0.1/nginx-health]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  burrow-data:
+  grafana-data:

@@ -102,26 +102,25 @@ frontend with `-tags embedweb`; build `web/dist` first, normally through
 ## Seed and default roles
 
 `make seed` is explicit, noninteractive and idempotent. Run migration first. It
-adds missing built-in roles and creates the configured administrator only in an
+adds the missing Administrator role and creates the configured administrator only in an
 empty user database. Repeated execution must preserve existing passwords,
 profiles, account states and user assignments. Reject reserved-role conflicts
 and an existing bootstrap username that is not already an administrator.
 
 - **Administrator:** all management and application access, subject to account,
   application and authentication-source restrictions.
-- **Editor:** read management resources and maintain applications/Providers;
-  no user management, password reset, identity linking or authorization changes.
-- **Viewer:** personal resources and the authorized application portal only;
-  no management permissions and no implicit application-login grants.
+  Administrator is the only seeded built-in role and is immutable. Application-login
+  permissions belong to ordinary roles assigned to users or groups. Do not attach
+  blanket APP permissions to built-in roles. New users have no roles by default;
+  respect explicit role assignments and never backfill existing users. Personal
+  profiles and the portal require authentication, not a baseline role.
 
-Built-in roles are immutable. Application-login permissions belong to ordinary
-roles and can reach users directly or through groups. Do not attach blanket APP
-permissions to the built-in roles.
-
-When a new user's `roleIds` is omitted, assign Viewer and preselect it in the
-creation form. Respect explicit roles, including an empty list. Do not backfill
-existing users or reassign Viewer when editing a user. Additional explicitly
-assigned roles may grant more permissions through the normal union.
+Migration 003 removes empty Viewer assignments and unused legacy Editor/Viewer
+roles, converting assigned legacy roles with permissions to ordinary roles while
+preserving their grants and user/group relationships. Seed must not recreate them.
+Keep `app:<application ID>:login` stable internally. Permission lists and role
+selectors display the current application name and Client ID using compact,
+batched application references available under `permissions:read`.
 
 The Users list returns group IDs and compact group references using batched
 queries. Preserve this capability under `users:read` without requiring access to

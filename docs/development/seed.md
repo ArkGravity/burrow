@@ -19,32 +19,53 @@ production database, configure an independent initial password through
 An existing administrator's password is not validated against or replaced by the
 bootstrap password on a repeat seed.
 
-## Default roles
+## Roles and application grants
 
-| Role          | Permissions                                                                                                                                                     |
-| ------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Administrator | Administrator behavior based on the `admin` ID; all current permissions and APP access, with normal account/APP/source checks                                   |
-| Editor        | `dashboard:read`, `users:read`, `groups:read`, `roles:read`, `permissions:read`, `applications:read`, `applications:write`, `providers:read`, `providers:write` |
-| Viewer        | No management permissions; authenticated users can access their own profile and their authorized application portal                                             |
+Administrator (`admin`) is the only seeded built-in role. Its ID grants
+administrator behavior, subject to account/application/source checks. The built-in
+flag alone does not grant administrator privilege. Administrator cannot be edited
+or deleted.
 
-Built-in roles cannot be edited or deleted. The built-in flag does not grant
-administrator privilege. Editor maintains security-sensitive client and Provider
-configuration and should be assigned only to trusted operators. It cannot reset
-passwords, link external identities, manage users/groups or change authorization.
+Other roles are ordinary, editable permission sets created by operators with
+`authorization:write`. Application access follows user/group → role → application
+login permission. A single role can include one application or several explicitly
+selected applications. New applications do not automatically grant access to
+existing roles. Burrow application grants do not assign business roles in Grafana,
+Harbor or other applications.
 
-APP access is assigned through ordinary roles and group roles. Do not grant APP
-login to the built-in Viewer role: every newly created user would otherwise gain
-the same application. Built-in roles are excluded from APP login assignments.
-Viewer users may receive additional explicit roles; effective permissions remain
-the union of their direct roles and group roles.
+The permission code remains `app:<application ID>:login`. The management list and
+role selector display the current application name, login action and Client ID.
+Names may change or repeat without changing grants; Client ID distinguishes
+applications with the same display name. The permissions API returns a compact
+`application: {id, name, clientId}` reference under `permissions:read`, loaded in a
+batch without requiring `applications:read` or exposing secrets/client settings.
+Search supports application names, Client IDs and permission codes.
+
+## Upgrade from Editor and Viewer
+
+Migration `003_custom_roles.sql` upgrades schema v2 to v3 in a transaction:
+
+- Remove user/group assignments to the legacy built-in Viewer when it has no
+  permissions, preserving the authenticated profile/portal behavior.
+- Remove unused legacy built-in Editor/Viewer roles and their permission links.
+- Preserve assigned legacy roles with actual permissions as ordinary roles,
+  retaining IDs, permissions and user/group assignments. Preexisting custom roles
+  named Editor/Viewer are not changed.
+- Record a `roles:migrate` policy event with the migration. Seed does not recreate
+  either role or supplement their former permissions.
+
+Back up the database and retain its master key before upgrading. Stop the old
+server, migrate with the new binary, seed, then start the new server. Older binaries
+reject schema v3; use the pre-upgrade backup for rollback.
 
 ## New-user defaults and group display
 
-The creation form preselects Viewer. The API applies Viewer only when `roleIds`
-is omitted on creation. An explicit empty array or another role list is respected,
-and updates do not restore Viewer automatically. The implicit default is permitted
-for an operator with `users:write`; explicit assignments still require
-`authorization:write`. Existing users are not backfilled.
+The creation form does not preselect a role. Omitted `roleIds` and an explicit empty
+array both create a user with no roles; updates never add default roles. A valid
+session grants access to personal resources and the authorized application portal,
+even without roles. No application access is implicit. Creating a user without
+role fields needs `users:write`; explicit authorization fields still require
+`authorization:write`.
 
 The Users list includes group summaries (`groups: [{id, name}]`) and existing
 `groupIds`. Memberships and role IDs are loaded in batches for the current page.

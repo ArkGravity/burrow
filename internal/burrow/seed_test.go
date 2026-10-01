@@ -35,7 +35,7 @@ func TestSeedIsIdempotentAndPreservesAdministrator(t *testing.T) {
 				t.Fatal("seed duplicated users")
 			}
 			s.DB.Model(&Role{}).Where("builtin = ?", true).Count(&count)
-			if count != 3 {
+			if count != 1 {
 				t.Fatal("default roles missing")
 			}
 			s.DB.Model(&RolePermission{}).Where("role_id = ?", "viewer").Count(&count)
@@ -72,69 +72,82 @@ func TestSeedRejectsUsernameCollisionAndProductionExamplePassword(t *testing.T) 
 	}
 }
 
-func TestNewUsersDefaultToViewerAndCanExplicitlyChooseRoles(t *testing.T) {
-	b, c, _ := testServer(t, "sqlite")
-	for _, example := range []struct {
-		username  string
-		roles     any
-		specified bool
-		expected  []string
-	}{
-		{"default-viewer", nil, false, []string{"viewer"}},
-		{"explicit-editor", []string{"editor"}, true, []string{"editor"}},
-		{"no-roles", []string{}, true, []string{}},
-	} {
-		body := map[string]any{"username": example.username, "name": example.username, "localEnabled": false}
-		if example.specified {
-			body["roleIds"] = example.roles
-		}
-		w := c.request("POST", "/api/v1/users", body, true)
-		if w.Code != 201 {
-			t.Fatalf("create: %d %s", w.Code, w.Body.String())
-		}
-		var user User
-		if err := json.Unmarshal(w.Body.Bytes(), &user); err != nil {
-			t.Fatal(err)
-		}
-		if strings.Join(user.RoleIDs, ",") != strings.Join(example.expected, ",") {
-			t.Fatal("wrong default role")
-		}
-		w = c.request("PUT", "/api/v1/users/"+user.ID, map[string]any{"name": "updated"}, true)
-		if w.Code != 200 {
-			t.Fatal(w.Body.String())
-		}
-		var updated User
-		json.Unmarshal(w.Body.Bytes(), &updated)
-		if strings.Join(updated.RoleIDs, ",") != strings.Join(example.expected, ",") {
-			t.Fatal("edit changed roles")
-		}
-	}
-	// Only users:write is required for the implicit Viewer default; explicit
-	// authorization changes still require authorization:write.
-	h, _ := passwordHash(testPassword)
-	operator := User{ID: random(18), Username: "provisioner", Enabled: true, LocalEnabled: true, PasswordHash: h}
-	b.DB.Create(&operator)
-	role := Role{ID: random(18), Name: "provisioner"}
-	b.DB.Create(&role)
-	b.DB.Create(&RolePermission{RoleID: role.ID, PermissionID: "users:write"})
-	b.DB.Create(&UserRole{UserID: operator.ID, RoleID: role.ID})
-	limited := newBrowser(b)
-	limited.login(t, operator.Username, testPassword)
-	if w := limited.request("POST", "/api/v1/users", map[string]any{"username": "implicit-viewer", "localEnabled": false}, true); w.Code != 201 {
-		t.Fatal(w.Body.String())
-	}
-	if w := limited.request("POST", "/api/v1/users", map[string]any{"username": "escalate", "localEnabled": false, "roleIds": []string{"editor"}}, true); w.Code != 403 {
-		t.Fatal("provisioner assigned explicit roles")
+func TestNewUsersDefaultToNoRolesAndCanExplicitlyChooseRoles(t *testing.T) {
+	for _, driver := range []string{"sqlite", "postgres"} {
+		t.Run(driver, func(t *testing.T) {
+			b, c, _ := testServer(t, driver)
+			b.DB.Create(&Role{ID: "operator", Name: "Operator"})
+			for _, example := range []struct {
+				username  string
+				roles     any
+				specified bool
+				expected  []string
+			}{
+				{"default-user", nil, false, []string{}},
+				{"explicit-operator", []string{"operator"}, true, []string{"operator"}},
+				{"no-roles", []string{}, true, []string{}},
+			} {
+				body := map[string]any{"username": example.username, "name": example.username, "localEnabled": false}
+				if example.specified {
+					body["roleIds"] = example.roles
+				}
+				w := c.request("POST", "/api/v1/users", body, true)
+				if w.Code != 201 {
+					t.Fatalf("create: %d %s", w.Code, w.Body.String())
+				}
+				var user User
+				if err := json.Unmarshal(w.Body.Bytes(), &user); err != nil {
+					t.Fatal(err)
+				}
+				if strings.Join(user.RoleIDs, ",") != strings.Join(example.expected, ",") {
+					t.Fatal("wrong default role")
+				}
+				w = c.request("PUT", "/api/v1/users/"+user.ID, map[string]any{"name": "updated"}, true)
+				if w.Code != 200 {
+					t.Fatal(w.Body.String())
+				}
+				var updated User
+				json.Unmarshal(w.Body.Bytes(), &updated)
+				if strings.Join(updated.RoleIDs, ",") != strings.Join(example.expected, ",") {
+					t.Fatal("edit changed roles")
+				}
+			}
+			// Only users:write is required to create an account with no roles; explicit
+			// authorization changes still require authorization:write.
+			h, _ := passwordHash(testPassword)
+			operator := User{ID: random(18), Username: "provisioner", Enabled: true, LocalEnabled: true, PasswordHash: h}
+			b.DB.Create(&operator)
+			role := Role{ID: random(18), Name: "provisioner"}
+			b.DB.Create(&role)
+			b.DB.Create(&RolePermission{RoleID: role.ID, PermissionID: "users:write"})
+			b.DB.Create(&UserRole{UserID: operator.ID, RoleID: role.ID})
+			limited := newBrowser(b)
+			limited.login(t, operator.Username, testPassword)
+			if w := limited.request("POST", "/api/v1/users", map[string]any{"username": "unassigned-user", "localEnabled": false}, true); w.Code != 201 {
+				t.Fatal(w.Body.String())
+			}
+			if w := limited.request("POST", "/api/v1/users", map[string]any{"username": "escalate", "localEnabled": false, "roleIds": []string{"operator"}}, true); w.Code != 403 {
+				t.Fatal("provisioner assigned explicit roles")
+			}
+		})
 	}
 }
 
 func TestDefaultRoleBoundariesAndUserGroupSummaries(t *testing.T) {
 	b, admin, _ := testServer(t, "sqlite")
 	h, _ := passwordHash(testPassword)
-	for _, role := range []string{"viewer", "editor"} {
+	for _, role := range []string{"unassigned", "operator"} {
+		if role == "operator" {
+			b.DB.Create(&Role{ID: role, Name: "Application operator"})
+			for _, permission := range []string{"applications:write", "providers:write"} {
+				b.DB.Create(&RolePermission{RoleID: role, PermissionID: permission})
+			}
+		}
 		u := User{ID: random(18), Username: role, Enabled: true, LocalEnabled: true, PasswordHash: h}
 		b.DB.Create(&u)
-		b.DB.Create(&UserRole{UserID: u.ID, RoleID: role})
+		if role == "operator" {
+			b.DB.Create(&UserRole{UserID: u.ID, RoleID: role})
+		}
 		c := newBrowser(b)
 		c.login(t, u.Username, testPassword)
 		if w := c.request("GET", "/api/v1/me", nil, false); w.Code != 200 {
@@ -149,7 +162,7 @@ func TestDefaultRoleBoundariesAndUserGroupSummaries(t *testing.T) {
 		if w := c.request("POST", "/api/v1/roles", map[string]any{"name": "denied"}, true); w.Code != 403 {
 			t.Fatal("default role manages authorization")
 		}
-		if role == "viewer" {
+		if role == "unassigned" {
 			for _, resource := range []string{"users", "groups", "roles", "permissions", "applications", "providers"} {
 				if w := c.request("GET", "/api/v1/"+resource, nil, false); w.Code != 403 {
 					t.Fatal("Viewer reads management resources")
@@ -162,7 +175,7 @@ func TestDefaultRoleBoundariesAndUserGroupSummaries(t *testing.T) {
 		}
 	}
 	var viewer User
-	b.DB.First(&viewer, "username = ?", "viewer")
+	b.DB.First(&viewer, "username = ?", "unassigned")
 	group := Group{ID: random(18), Name: "Engineering"}
 	b.DB.Create(&group)
 	b.DB.Create(&GroupMember{GroupID: group.ID, UserID: viewer.ID})
@@ -195,7 +208,7 @@ func TestDefaultRoleBoundariesAndUserGroupSummaries(t *testing.T) {
 	if w.Code != 200 || !strings.Contains(w.Body.String(), "Engineering") {
 		t.Fatal("reader cannot see user group names")
 	}
-	for _, role := range []string{"viewer", "editor"} {
+	for _, role := range []string{"admin"} {
 		app := testApp(t, b, "spa")
 		if w := admin.request("PUT", "/api/v1/applications/"+app.ID, map[string]any{"roleIds": []string{role}}, true); w.Code != 409 {
 			t.Fatal("built-in role received blanket application access")

@@ -47,7 +47,12 @@ func (b *Server) list(w http.ResponseWriter, r *http.Request, resource string) {
 	}
 	q := b.DB.Model(out)
 	if search := r.URL.Query().Get("search"); search != "" {
-		q = q.Where("LOWER(name) LIKE ?", "%"+strings.ToLower(search)+"%")
+		pattern := "%" + strings.ToLower(search) + "%"
+		if resource == "permissions" {
+			q = q.Where("LOWER(name) LIKE ? OR application_id IN (SELECT id FROM applications WHERE LOWER(name) LIKE ? OR LOWER(client_id) LIKE ?)", pattern, pattern, pattern)
+		} else {
+			q = q.Where("LOWER(name) LIKE ?", pattern)
+		}
 	}
 	if status := r.URL.Query().Get("enabled"); status != "" && (resource == "users" || resource == "applications" || resource == "providers") {
 		q = q.Where("enabled = ?", status == "true")
@@ -58,6 +63,29 @@ func (b *Server) list(w http.ResponseWriter, r *http.Request, resource string) {
 		return
 	}
 	switch values := out.(type) {
+	case *[]Permission:
+		ids := []string{}
+		for _, v := range *values {
+			if v.ApplicationID != "" {
+				ids = append(ids, v.ApplicationID)
+			}
+		}
+		if len(ids) > 0 {
+			var apps []ApplicationRef
+			if err := b.DB.Model(&Application{}).Select("id", "name", "client_id").Where("id IN ?", ids).Scan(&apps).Error; err != nil {
+				fail(w, r, 503, "unavailable")
+				return
+			}
+			refs := map[string]ApplicationRef{}
+			for _, app := range apps {
+				refs[app.ID] = app
+			}
+			for i := range *values {
+				if app, ok := refs[(*values)[i].ApplicationID]; ok {
+					(*values)[i].Application = &app
+				}
+			}
+		}
 	case *[]User:
 		if err := b.hydrateUsers(b.DB, *values); err != nil {
 			fail(w, r, 503, "unavailable")
@@ -190,7 +218,7 @@ func (b *Server) mutate(w http.ResponseWriter, r *http.Request, resource string)
 		"users":        {"username", "name", "email", "enabled", "localEnabled", "mustChangePassword", "language", "theme", "password", "roleIds", "groupIds"},
 		"groups":       {"name", "description", "userIds", "roleIds"},
 		"roles":        {"name", "description", "permissionIds"},
-		"applications": {"name", "clientId", "clientType", "enabled", "icon", "loginUrl", "redirectUris", "postLogoutRedirectUris", "origins", "localEnabled", "allowWithoutPkce", "providerIds", "roleIds"},
+		"applications": {"name", "clientId", "clientSecret", "clientType", "enabled", "icon", "loginUrl", "redirectUris", "postLogoutRedirectUris", "origins", "localEnabled", "allowWithoutPkce", "providerIds", "roleIds"},
 		"providers":    {"name", "issuer", "clientId", "clientSecret", "enabled"},
 	}
 	for k := range in {
@@ -293,11 +321,6 @@ func (b *Server) mutate(w http.ResponseWriter, r *http.Request, resource string)
 			if err := b.assign(tx, "users", id, in, admin); err != nil {
 				return err
 			}
-			if _, explicit := in["roleIds"]; creating && !explicit {
-				if err := tx.Create(&UserRole{UserID: id, RoleID: "viewer"}).Error; err != nil {
-					return err
-				}
-			}
 			if !u.Enabled || passwordProvided {
 				if err := tx.Model(&Session{}).Where("user_id = ?", id).Update("revoked", true).Error; err != nil {
 					return err
@@ -360,6 +383,31 @@ func (b *Server) mutate(w http.ResponseWriter, r *http.Request, resource string)
 			oldClient := v.ClientID
 			oldType := v.ClientType
 			oldAllowWithoutPKCE := v.AllowWithoutPKCE
+			if raw, present := in["clientId"]; present && creating {
+				var value string
+				if string(raw) == "null" || json.Unmarshal(raw, &value) != nil {
+					return invalid("client_id")
+				}
+				if value == "" {
+					delete(in, "clientId")
+					data, _ = json.Marshal(in)
+				} else if len(value) > 128 || strings.IndexFunc(value, func(r rune) bool {
+					return !((r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') || strings.ContainsRune("-._~", r))
+				}) >= 0 {
+					return invalid("client_id")
+				}
+			}
+			if raw, present := in["clientSecret"]; present {
+				if !creating {
+					return invalid("immutable_client")
+				}
+				if string(raw) == "null" || json.Unmarshal(raw, &secret) != nil {
+					return invalid("client_secret")
+				}
+				if secret != "" && (len(secret) < 16 || len(secret) > 256 || strings.IndexFunc(secret, func(r rune) bool { return r < 33 || r > 126 }) >= 0) {
+					return invalid("client_secret")
+				}
+			}
 			if raw, present := in["allowWithoutPkce"]; present {
 				var value bool
 				if string(raw) == "null" || json.Unmarshal(raw, &value) != nil {
@@ -398,8 +446,13 @@ func (b *Server) mutate(w http.ResponseWriter, r *http.Request, resource string)
 					return err
 				}
 			}
+			if v.ClientType == "spa" && secret != "" {
+				return invalid("client_secret")
+			}
 			if creating && v.ClientType == "web" {
-				secret = random(32)
+				if secret == "" {
+					secret = random(32)
+				}
 				v.SecretHash = hash(secret)
 			}
 			if err := tx.Save(&v).Error; err != nil {

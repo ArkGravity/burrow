@@ -48,7 +48,7 @@ test("administrator provisions access and ordinary users see only their portal",
     page
       .locator(".ant-drawer .ant-select-selection-item")
       .filter({ hasText: "Viewer" }),
-  ).toBeVisible();
+  ).toHaveCount(0);
   await page.getByLabel("Username", { exact: true }).fill("alice");
   await page.getByLabel("Name", { exact: true }).fill("Alice");
   await page.getByLabel("Email", { exact: true }).fill("alice@example.test");
@@ -62,10 +62,16 @@ test("administrator provisions access and ordinary users see only their portal",
     createdUsers.items.find(
       (user: { username: string }) => user.username === "alice",
     ).roleIds,
-  ).toEqual(["viewer"]);
+  ).toEqual([]);
   await page.getByRole("link", { name: "Applications", exact: true }).click();
   await page.getByRole("button", { name: "Create", exact: true }).click();
   await page.getByLabel("Name", { exact: true }).fill("Engineering");
+  await page
+    .getByLabel("Client ID", { exact: true })
+    .fill("engineering-example");
+  await page
+    .getByLabel("Client secret", { exact: true })
+    .fill("engineering-example-secret");
   await page
     .getByLabel("Application login URL", { exact: true })
     .fill("http://localhost:19001/login");
@@ -74,6 +80,9 @@ test("administrator provisions access and ordinary users see only their portal",
     .fill("http://localhost:19001/callback");
   await page.getByRole("button", { name: "Save changes", exact: true }).click();
   await expect(page.getByText("Save this secret now")).toBeVisible();
+  await expect(
+    page.getByText("engineering-example-secret", { exact: true }),
+  ).toBeVisible();
   await page.getByRole("button", { name: "Close", exact: true }).last().click();
   await page.getByRole("link", { name: "Roles", exact: true }).click();
   await page.getByRole("button", { name: "Create", exact: true }).click();
@@ -83,10 +92,10 @@ test("administrator provisions access and ordinary users see only their portal",
     .click();
   await page
     .getByRole("combobox", { name: "Permissions", exact: true })
-    .fill("app:");
+    .fill("Engineering");
   await page
     .locator(".ant-select-item-option")
-    .filter({ hasText: /app:.*:login/ })
+    .filter({ hasText: "Engineering · Login" })
     .click();
   await page.getByRole("button", { name: "Save changes", exact: true }).click();
   await expect(page.getByText("Engineers", { exact: true })).toBeVisible();

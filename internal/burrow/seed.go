@@ -6,7 +6,6 @@ import (
 	"strings"
 
 	"gorm.io/gorm"
-	"gorm.io/gorm/clause"
 )
 
 // BootstrapConfig is used only by the explicit seed command. Passwords are
@@ -19,11 +18,6 @@ type BootstrapConfig struct {
 }
 
 const developmentAdminPassword = "Burrow-development-admin-2026"
-
-var editorPermissions = []string{
-	"dashboard:read", "users:read", "groups:read", "roles:read", "permissions:read",
-	"applications:read", "applications:write", "providers:read", "providers:write",
-}
 
 // Seed supplements the built-in roles and bootstraps an empty database. It does
 // not reset passwords or change the status/assignments of existing users.
@@ -45,8 +39,6 @@ func (s *Store) Seed(options BootstrapConfig) error {
 		}
 		for _, role := range []Role{
 			{ID: "admin", Name: "Administrator", Description: "Built-in administrator", Builtin: true},
-			{ID: "editor", Name: "Editor", Description: "Manage applications and providers; read management resources", Builtin: true},
-			{ID: "viewer", Name: "Viewer", Description: "Personal profile and authorized application portal only", Builtin: true},
 		} {
 			var existing Role
 			err := tx.First(&existing, "id = ? OR name = ?", role.ID, role.Name).Error
@@ -58,11 +50,6 @@ func (s *Store) Seed(options BootstrapConfig) error {
 				return err
 			} else if existing.ID != role.ID || !existing.Builtin {
 				return errors.New("bootstrap role conflicts with an existing role")
-			}
-		}
-		for _, id := range editorPermissions {
-			if err := tx.Clauses(clause.OnConflict{DoNothing: true}).Create(&RolePermission{RoleID: "editor", PermissionID: id}).Error; err != nil {
-				return err
 			}
 		}
 		var user User

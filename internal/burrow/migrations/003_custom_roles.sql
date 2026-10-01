@@ -1,0 +1,6 @@
+DELETE FROM user_roles WHERE role_id IN (SELECT id FROM roles WHERE id = 'viewer' AND builtin = TRUE) AND NOT EXISTS (SELECT 1 FROM role_permissions WHERE role_id = 'viewer');
+DELETE FROM group_roles WHERE role_id IN (SELECT id FROM roles WHERE id = 'viewer' AND builtin = TRUE) AND NOT EXISTS (SELECT 1 FROM role_permissions WHERE role_id = 'viewer');
+DELETE FROM role_permissions WHERE role_id IN (SELECT id FROM roles WHERE id IN ('editor', 'viewer') AND builtin = TRUE AND NOT EXISTS (SELECT 1 FROM user_roles WHERE role_id = roles.id) AND NOT EXISTS (SELECT 1 FROM group_roles WHERE role_id = roles.id));
+DELETE FROM roles WHERE id IN ('editor', 'viewer') AND builtin = TRUE AND NOT EXISTS (SELECT 1 FROM user_roles WHERE role_id = roles.id) AND NOT EXISTS (SELECT 1 FROM group_roles WHERE role_id = roles.id) AND NOT EXISTS (SELECT 1 FROM role_permissions WHERE role_id = roles.id);
+UPDATE roles SET builtin = FALSE WHERE id IN ('editor', 'viewer') AND builtin = TRUE;
+INSERT INTO events (id, actor_id, object_id, kind, success, request_id, created_at, details) VALUES ('migration:003:custom_roles', '', '', 'roles:migrate', TRUE, '', CURRENT_TIMESTAMP, '{"migration":3,"policy":"remove empty Viewer assignments and unused legacy roles, preserve assigned legacy permissions as custom roles"}') ON CONFLICT (id) DO NOTHING;

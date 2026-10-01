@@ -90,7 +90,7 @@ func (s *Store) Migrate() error {
 		if err := tx.First(&v, 1).Error; err != nil {
 			return err
 		}
-		migrations := []string{initialMigration, pkceCompatibilityMigration}
+		migrations := []string{initialMigration, pkceCompatibilityMigration, customRolesMigration}
 		if v.Version > len(migrations) {
 			return errors.New("database schema is newer than binary")
 		}
@@ -119,7 +119,7 @@ func (s *Store) Health(ctx context.Context) error {
 	if err := s.DB.WithContext(ctx).First(&v, 1).Error; err != nil {
 		return err
 	}
-	if v.Version != 2 || v.Checksum != migrationChecksum(2) {
+	if v.Version != 3 || v.Checksum != migrationChecksum(3) {
 		return errors.New("migration required")
 	}
 	return nil
@@ -257,11 +257,17 @@ var initialMigration string
 //go:embed migrations/002_pkce_compatibility.sql
 var pkceCompatibilityMigration string
 
+//go:embed migrations/003_custom_roles.sql
+var customRolesMigration string
+
 func migrationChecksum(version int) string {
 	if version == 1 {
 		return hash(initialMigration)
 	}
-	return hash(initialMigration + pkceCompatibilityMigration)
+	if version == 2 {
+		return hash(initialMigration + pkceCompatibilityMigration)
+	}
+	return hash(initialMigration + pkceCompatibilityMigration + customRolesMigration)
 }
 
 func (c *Config) defaults() {

@@ -109,6 +109,13 @@ const definitions: Record<
         ],
         required: true,
       },
+      { key: "clientId", label: "clientId", createOnly: true },
+      {
+        key: "clientSecret",
+        label: "clientSecret",
+        type: "password",
+        createOnly: true,
+      },
       { key: "enabled", label: "enabled", type: "switch" },
       { key: "loginUrl", label: "loginUrl", required: true },
       { key: "icon", label: "icon" },
@@ -171,6 +178,13 @@ export function Resources({ resource }: { resource: string }) {
   const writable = can(session?.permissions || [], def.permission);
   const authWritable = can(session?.permissions || [], "authorization:write");
   const administrator = session?.administrator === true;
+  const permissionLabel = (row: Row) => {
+    const app = row.application as
+      { name?: string; clientId?: string } | undefined;
+    return app
+      ? `${app.name || app.clientId} · ${t("applicationLoginPermission")} (${app.clientId})`
+      : String(row.name || row.id);
+  };
   const load = useCallback(async () => {
     setLoading(true);
     setError("");
@@ -208,7 +222,6 @@ export function Resources({ resource }: { resource: string }) {
             localEnabled: true,
             clientType: "web",
             allowWithoutPkce: false,
-            ...(resource === "users" ? { roleIds: ["viewer"] } : {}),
           },
     );
     const sources = [
@@ -253,6 +266,8 @@ export function Resources({ resource }: { resource: string }) {
       }
       if (values.clientSecret === "") delete values.clientSecret;
       if (resource === "applications") {
+        if (!values.clientId) delete values.clientId;
+        if (editing || values.clientType === "spa") delete values.clientSecret;
         if (!administrator) delete values.allowWithoutPkce;
         else if (values.clientType === "spa") values.allowWithoutPkce = false;
       }
@@ -296,9 +311,15 @@ export function Resources({ resource }: { resource: string }) {
               .toUpperCase()}
           </span>
           <div>
-            <strong>{String(row.name || row.username || row.id)}</strong>
+            <strong>
+              {resource === "permissions"
+                ? permissionLabel(row)
+                : String(row.name || row.username || row.id)}
+            </strong>
             <div className="record-sub">
-              {String(row.username || row.clientId || row.description || "")}
+              {resource === "permissions"
+                ? row.id
+                : String(row.username || row.clientId || row.description || "")}
             </div>
           </div>
           {row.builtin === true && <Tag>{t("builtin")}</Tag>}
@@ -515,6 +536,9 @@ export function Resources({ resource }: { resource: string }) {
             .filter(
               (f) =>
                 (!f.createOnly || !editing) &&
+                (resource !== "applications" ||
+                  f.key !== "clientSecret" ||
+                  clientType === "web") &&
                 (f.key !== "allowWithoutPkce" || clientType === "web"),
             )
             .map((field) => {
@@ -538,11 +562,16 @@ export function Resources({ resource }: { resource: string }) {
                       : []),
                   ]}
                   extra={
-                    field.key === "allowWithoutPkce"
-                      ? t("allowWithoutPkceHint")
-                      : field.type === "urls"
-                        ? t("linesHint")
-                        : undefined
+                    resource === "applications" && field.key === "clientId"
+                      ? t("applicationClientIdHint")
+                      : resource === "applications" &&
+                          field.key === "clientSecret"
+                        ? t("applicationClientSecretHint")
+                        : field.key === "allowWithoutPkce"
+                          ? t("allowWithoutPkceHint")
+                          : field.type === "urls"
+                            ? t("linesHint")
+                            : undefined
                   }
                 >
                   {field.type === "switch" ? (
@@ -571,7 +600,10 @@ export function Resources({ resource }: { resource: string }) {
                         )
                         .map((r) => ({
                           value: r.id,
-                          label: String(r.name || r.username || r.id),
+                          label:
+                            field.source === "permissions"
+                              ? permissionLabel(r)
+                              : String(r.name || r.username || r.id),
                         }))}
                     />
                   ) : field.type === "select" ? (

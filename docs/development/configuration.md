@@ -85,7 +85,7 @@ database. `make compose-up` uses existing local images; build or pull them first
 
 ## Administrator bootstrap
 
-`make seed` reads the `bootstrap` section. It creates the three default roles and
+`make seed` reads the `bootstrap` section. It creates the Administrator role and
 the initial administrator without stdin prompts or password output. The username
 is `admin`, display name `Administrator`, email empty and development password
 `Burrow-development-admin-2026`. Override these settings before first creation:

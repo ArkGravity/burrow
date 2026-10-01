@@ -78,6 +78,7 @@ const en = {
   passwordMismatch: "Passwords do not match",
   passwordHint: "Use at least 12 characters",
   clientId: "Client ID",
+  applicationLoginPermission: "Login",
   clientType: "Client type",
   allowWithoutPkce: "Allow login without PKCE",
   allowWithoutPkceHint:
@@ -85,6 +86,10 @@ const en = {
   webClient: "Server-side web",
   spaClient: "Browser SPA",
   clientSecret: "Client secret",
+  applicationClientIdHint:
+    "Optional: leave blank to generate. Use up to 128 letters, digits or - . _ ~. Cannot be changed after creation.",
+  applicationClientSecretHint:
+    "Optional: leave blank to generate. Use 16–256 printable ASCII characters without spaces. Displayed once; stored as a hash. Use Reset secret to rotate it later.",
   issuer: "Issuer URL",
   loginUrl: "Application login URL",
   icon: "Icon URL",
@@ -206,6 +211,7 @@ const zh: Record<Key, string> = {
   passwordMismatch: "两次输入的密码不一致",
   passwordHint: "请使用至少 12 位字符",
   clientId: "客户端 ID",
+  applicationLoginPermission: "登录",
   clientType: "客户端类型",
   allowWithoutPkce: "允许不使用 PKCE 登录",
   allowWithoutPkceHint:
@@ -213,6 +219,10 @@ const zh: Record<Key, string> = {
   webClient: "服务端 Web",
   spaClient: "浏览器 SPA",
   clientSecret: "客户端密钥",
+  applicationClientIdHint:
+    "可选，留空自动生成。最多 128 个字母、数字或 - . _ ~，创建后不可修改。",
+  applicationClientSecretHint:
+    "可选，留空自动生成。16–256 个不含空格的可打印 ASCII 字符，仅显示一次并以哈希存储。之后可通过重置密钥进行轮换。",
   issuer: "Issuer 地址",
   loginUrl: "应用登录入口",
   icon: "图标地址",

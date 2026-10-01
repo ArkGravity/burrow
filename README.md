@@ -165,19 +165,16 @@ Authorization-code exchange checks access again. The last enabled local
 administrator is protected. Burrow manages identity and application access;
 applications manage their own business permissions.
 
-Seed supplies three immutable default roles:
+Administrator is the only seeded built-in role. Other roles are custom permission
+sets assigned to users or groups. New users have no roles by default; authenticated
+users can still access their profile and portal. Application login requires an
+explicit grant through a custom role, unless the user is an administrator.
 
-| Role          | Default access                                                                                                           |
-| ------------- | ------------------------------------------------------------------------------------------------------------------------ |
-| Administrator | All management and APP access, subject to account/APP state and authentication-source restrictions                       |
-| Editor        | Read management resources; maintain APP and Provider configuration; no user/password management or authorization changes |
-| Viewer        | Personal profile and authorized application portal only; no management permissions                                       |
-
-New users receive Viewer when roles are omitted; the creation form preselects it.
-Explicit roles, including an empty list, are respected. Existing users are not
-backfilled. When upgrading an existing instance, run `make migrate` and `make seed`
-using its original bootstrap username to add the new default roles. APP login remains an explicit grant through ordinary roles or groups;
-the default roles cannot be assigned blanket APP login permissions. The Users
+Application permissions display the current application name and Client ID in
+lists and role selectors, while retaining stable `app:<application ID>:login`
+identifiers. Migration 003 removes empty Viewer assignments and unused legacy
+Editor/Viewer roles; assigned legacy roles with permissions become custom roles
+without changing their grants. Seed does not recreate Editor or Viewer. The Users
 list shows group names so administrators can inspect membership directly.
 See [seed and default roles](docs/development/seed.md).
 

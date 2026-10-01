@@ -72,3 +72,30 @@ sh web/e2e/run.sh
   performed. Compatibility mode lowers authorization-code protection; the
   independent Web example still verifies nonce and does not represent the
   security behavior of Nightingale v9.1.1.
+
+## Application permission labels and custom roles (2026-10-01)
+
+- Optional application credentials passed dual-driver race coverage for defaults,
+  explicit values, duplicate/invalid values, Web code exchange, SPA secret
+  rejection, management permissions, secret rotation and audit rollback. The
+  browser provisioning flow also exercised manual Client ID/Secret input.
+
+- `make test-db` passed the full SQLite/PostgreSQL 17 race suite against an
+  isolated temporary database. Final additional tests for new-user defaults on
+  both drivers and migration audit rollback also passed. `make lint` passed.
+- Permission coverage checks application-name/Client-ID search, duplicate display
+  names, compact references under `permissions:read`, rename preserving grants
+  and successful OIDC authorization with the unchanged permission code.
+- Schema-v2 → v3 coverage checks checksum enforcement, repeat migration, empty
+  Viewer cleanup, unused Editor cleanup, preservation of assigned legacy grants
+  and custom roles, migration auditing and rollback when audit insertion fails.
+  New users have no default role; explicit role assignments retain authorization
+  checks. Seed only supplies Administrator and preserves existing credentials.
+- `make web-check` passed typecheck and two unit tests. `make test-e2e` passed all
+  three Chromium scenarios, including selecting an application permission by its
+  display name and granting ordinary-user portal access through a group role.
+- The Burrow Docker image was built. The independent local SSO Compose was
+  reset at the user's request and started with fresh SQLite/Grafana volumes.
+  Applications remain manually configured; full Grafana login after this reset
+  and production deployment have not been verified. This is local engineering
+  validation, not official OIDC certification.

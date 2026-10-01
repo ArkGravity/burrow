@@ -157,6 +157,14 @@ func TestPKCECompatibilityAdministration(t *testing.T) {
 					t.Fatalf("invalid SPA setting: %d", w.Code)
 				}
 			}
+			if err := b.DB.Create(&Role{ID: "editor", Name: "Application maintainer"}).Error; err != nil {
+				t.Fatal(err)
+			}
+			for _, permission := range []string{"applications:read", "applications:write"} {
+				if err := b.DB.Create(&RolePermission{RoleID: "editor", PermissionID: permission}).Error; err != nil {
+					t.Fatal(err)
+				}
+			}
 			h, err := passwordHash(testPassword)
 			if err != nil {
 				t.Fatal(err)

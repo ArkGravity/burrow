@@ -4,7 +4,7 @@
 
 ## 部署前检查
 
-- 升级 Burrow 前备份数据库并保留原 master key，按 [恢复与升级说明](recovery.md)操作。先迁移，再 seed，再启动服务；本次 schema 从 v1 升到 v2，旧二进制不能直接运行在 v2 数据库上。
+- 升级 Burrow 前备份数据库并保留原 master key，按 [恢复与升级说明](recovery.md)操作。先迁移，再 seed，再启动服务；当前 schema 为 v3，升级到 v3 后旧二进制不能直接运行在该数据库上。
 - 生产使用 PostgreSQL、HTTPS 和独立的生产凭据。确认 `server.issuer` / `BURROW_ISSUER` 是 Burrow 的实际对外地址。
 - 浏览器和 Grafana 后端都必须能访问 Burrow。容器内的 `localhost` 不是 Burrow 地址。
 - 检查 `<issuer>/.well-known/openid-configuration`，确认 issuer 和各端点没有指向开发地址。
@@ -29,7 +29,9 @@
 
 保存 Client ID 和一次性显示的 Client Secret。密钥丢失时重置并同步更新 Grafana。
 
-创建有姓名和有效邮箱的普通测试用户，启用账户和本地登录，先完成临时密码修改。创建普通角色 `Grafana Users`，授予对应 `app:<应用 ID>:login` 权限，再直接或通过组分配给测试用户。内置 Viewer 不自动授予应用登录权限；不要只用管理员验证授权。
+创建时可选填写固定 Client ID 和 Web Client Secret，留空自动生成。Client ID 最多 128 个字母、数字或 `-._~`；Secret 为 16–256 个不含空格的可打印 ASCII 字符。创建后 Client ID 不可修改，编辑表单不修改 Secret；轮换使用“重置密钥”。本地示例见 [独立 Docker Compose](../../examples/local-sso/README.md)，生产应使用独立的随机密钥。
+
+创建有姓名和有效邮箱的普通测试用户，启用账户和本地登录，先完成临时密码修改。创建普通角色 `Grafana Users`，授予对应 `app:<应用 ID>:login` 权限，再直接或通过组分配给测试用户。新用户默认无角色，需要通过普通角色授予应用登录权限；不要只用管理员验证授权。
 
 ## Grafana 配置
 
@@ -105,5 +107,7 @@ Docker 可以使用 `GF_<配置段>_<配置项>` 环境变量覆盖，例如 `GF
 | 签名验证失败       | Grafana 版本、JWKS URL、公钥可访问性                  |
 
 查看正常级别的 Grafana 错误日志，不记录或分享 Secret、授权码、Token。此前本地验证使用独立 Web/SPA 客户端，尚未实际验收 Grafana、Harbor 或 Nightingale；远端生产验收由部署环境另行记录。
+
+本地示例曾定位到 `unable to create user: user not found`：Burrow 的 `admin` 经 `preferred_username` 映射后，与 Grafana 已有本地 `admin` 重名，而账号未绑定该 OAuth 身份。使用不同用户名且已获应用权限的普通用户验收。`token is not in JWT format` 是 Grafana 尝试解析不透明 Access Token 的警告，需要结合后续错误判断；本次失败发生在用户同步阶段。
 
 参考：[Grafana Generic OAuth](https://grafana.com/docs/grafana/latest/setup-grafana/configure-access/configure-authentication/generic-oauth/)、[Grafana 配置](https://grafana.com/docs/grafana/latest/setup-grafana/configure-grafana/)、[Burrow 协议边界](../development/oidc-adapter.md)。
