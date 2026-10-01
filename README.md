@@ -1,3 +1,5 @@
+<img src="web/public/logo.svg" alt="Burrow logo" width="64" height="64" />
+
 # burrow
 
 A lightweight, single-organization OpenID Connect identity provider: shared SSO

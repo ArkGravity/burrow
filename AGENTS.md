@@ -176,12 +176,19 @@ when using local overrides. Inspect `make help` for available actions.
   backend and do not expose implementation details in product flows.
 - Keep fixes scoped, preserve unrelated user edits, and synchronize README,
   configuration references and operational guides when behavior changes.
+- Keep the native SVG brand asset in `web/public/logo.svg`; the favicon and
+  `BrandMark` component share it. The signed-in sidebar has one top brand entry,
+  linking to the portal, and retains the mark when collapsed on narrow screens.
 
 ## Local SSO integrations
 
 - The user reported successful local OIDC web-login acceptance for Grafana,
   Nightingale and Harbor on 2026-10-01. Keep this user-reported checkpoint distinct
   from automated checks, production validation and official OIDC certification.
+- The acceptance environment was subsequently removed at the user's request,
+  including its containers, volumes, networks, example images and Harbor's local
+  generated directories. The example source remains available for a fresh setup;
+  do not assume its previous local accounts or SSO settings still exist.
 - Maintain the independent `examples/local-sso` deployment without changing the
   root Compose or clearing existing databases. Burrow uses dev SQLite; Grafana,
   Nightingale and Harbor are reached through the example Nginx.

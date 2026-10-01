@@ -222,3 +222,25 @@ sh web/e2e/run.sh
   claim that every negative-access scenario in the example was executed. Production
   deployment, Docker/Helm CLI authentication and official certification remain
   outside this checkpoint. Earlier engineering checks above remain historical.
+
+## Branding and acceptance resource cleanup (2026-10-01)
+
+- Added a native SVG mark combining a burrow entrance and keyhole, using the
+  existing forest-green and pale-green palette. The favicon, README and shared
+  `BrandMark` component use the same asset. Login branding and the signed-in
+  sidebar now use this mark; the sidebar's duplicated wordmark was removed in
+  response to the user's screenshot, leaving one top home-link brand entry.
+- At the user's explicit request, removed the two local acceptance Compose
+  projects: 16 containers, three named data volumes, nine Harbor anonymous volumes
+  and two networks. Removed the 14 image tags used by the example and its official
+  prepare helper, plus Harbor's ignored data, logs and runtime directories.
+  Docker's default networks and unrelated cached images were retained; no global
+  prune or forced image deletion was used. Maintained example files remain intact.
+- Final inventory found no remaining Docker containers or volumes and only the
+  three default networks. Harbor's three generated directories were absent and
+  its maintained deployment files remained. The previously accepted three-app
+  login checkpoint remains historical; a future local run starts with fresh data.
+- As requested for this small branding change, no tests, typecheck, build or
+  browser regression was run. Delivery checks were limited to formatting, diff
+  review and verification of the scoped resource cleanup. No authentication or
+  authorization logic, root production Compose or remote deployment was changed.

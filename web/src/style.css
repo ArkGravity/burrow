@@ -82,15 +82,11 @@ p {
   color: var(--text);
 }
 .brand-mark {
-  display: grid;
-  place-items: center;
-  width: 35px;
-  height: 35px;
-  font-size: 29px;
-  color: #fff;
-  background: #254f3d;
-  border-radius: 10px;
-  padding-bottom: 6px;
+  display: block;
+  width: 36px;
+  height: 36px;
+  flex-shrink: 0;
+  object-fit: contain;
 }
 .brand-dot {
   color: #94b291;
@@ -98,10 +94,6 @@ p {
 }
 .brand.light {
   color: #f3f6eb;
-}
-.brand.light .brand-mark {
-  background: #d8e6b8;
-  color: #1b3a2d;
 }
 .eyebrow {
   font-size: 11px;
@@ -134,11 +126,8 @@ p {
   flex-direction: column;
   z-index: 10;
 }
-.sidebar .brand {
-  padding-left: 10px;
-}
 .workspace-label {
-  margin: 35px 0 28px;
+  margin: 0 0 28px;
   padding: 13px 10px;
   border: 1px solid var(--line);
   border-radius: 9px;
@@ -158,16 +147,6 @@ p {
 }
 .workspace-label .status-dot {
   margin-left: auto;
-}
-.org-monogram {
-  width: 30px;
-  height: 32px;
-  background: var(--hover);
-  border-radius: 6px;
-  display: grid;
-  place-items: center;
-  font-size: 15px;
-  font-weight: 600;
 }
 .nav-group {
   margin-bottom: 29px;
@@ -554,15 +533,12 @@ main {
 .orbit-art div:nth-child(2) {
   transform: rotate(30deg);
 }
-.orbit-art span {
+.orbit-art .brand-mark {
   position: absolute;
-  left: 89px;
-  top: 33px;
-  font-size: 62px;
-  font-family: "Manrope", sans-serif;
-  font-weight: 700;
-  color: #cdddaf;
-  transform: rotate(-8deg);
+  left: 76px;
+  top: 42px;
+  width: 86px;
+  height: 86px;
 }
 .auth-main {
   position: relative;
@@ -604,6 +580,10 @@ main {
   gap: 8px;
   align-items: center;
 }
+.auth-bottom .brand-mark {
+  width: 16px;
+  height: 16px;
+}
 .full-width {
   width: 100%;
 }
@@ -643,16 +623,15 @@ main {
     width: 68px;
     padding: 23px 9px;
   }
-  .sidebar .brand {
-    font-size: 0;
+  .sidebar .workspace-label {
+    margin: 0 0 10px;
     padding: 0;
+    border: 0;
     justify-content: center;
   }
-  .sidebar .brand-mark {
-    font-size: 29px;
-  }
   .brand-dot,
-  .workspace-label,
+  .workspace-label > div,
+  .workspace-label > .status-dot,
   .nav-label,
   .nav-item span:not(.anticon),
   .user-block div,

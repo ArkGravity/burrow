@@ -1,15 +1,13 @@
 import { useEffect, useState } from "react";
 import { Alert, App, Button, Divider, Form, Input, Space } from "antd";
-import {
-  ArrowRightOutlined,
-  SafetyCertificateOutlined,
-} from "@ant-design/icons";
+import { ArrowRightOutlined } from "@ant-design/icons";
 import { Navigate, useSearchParams } from "react-router-dom";
 import { api, write, APIError, resetCSRF, type Session } from "../lib/api";
 import { useI18n, errorKey } from "../lib/i18n";
 import { useSession } from "../lib/session";
 import { safeRedirect } from "../lib/access";
 import { Preferences } from "../components/Preferences";
+import { BrandMark } from "../components/BrandMark";
 
 export function AuthFrame({ children }: { children: React.ReactNode }) {
   const { t } = useI18n();
@@ -17,7 +15,8 @@ export function AuthFrame({ children }: { children: React.ReactNode }) {
     <div className="auth-layout">
       <aside className="auth-story">
         <a href="/" className="brand light">
-          <span className="brand-mark">b.</span>burrow
+          <BrandMark />
+          burrow
           <span className="brand-dot">/</span>
         </a>
         <div className="auth-story-body">
@@ -30,7 +29,7 @@ export function AuthFrame({ children }: { children: React.ReactNode }) {
           <div className="orbit-art" aria-hidden="true">
             <div />
             <div />
-            <span>b.</span>
+            <BrandMark />
           </div>
         </div>
         <span className="auth-footer">{t("footer")}</span>
@@ -41,7 +40,7 @@ export function AuthFrame({ children }: { children: React.ReactNode }) {
         </div>
         <div className="auth-card">{children}</div>
         <span className="auth-bottom">
-          <SafetyCertificateOutlined /> Burrow Identity
+          <BrandMark /> Burrow Identity
         </span>
       </section>
     </div>

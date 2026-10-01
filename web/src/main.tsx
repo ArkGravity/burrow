@@ -40,6 +40,7 @@ import {
 } from "./lib/i18n";
 import { SessionContext, useSession } from "./lib/session";
 import { Preferences, ThemeContext, type Mode } from "./components/Preferences";
+import { BrandMark } from "./components/BrandMark";
 import { ChangePasswordPage, LoginPage, LogoutPage } from "./pages/Auth";
 import { HomePage, ProfilePage } from "./pages/Home";
 import { Resources } from "./pages/Resources";
@@ -80,18 +81,14 @@ function Shell() {
   return (
     <div className="workspace">
       <aside className="sidebar">
-        <NavLink to="/" className="brand">
-          <span className="brand-mark">b.</span>burrow
-          <span className="brand-dot">/</span>
-        </NavLink>
-        <div className="workspace-label">
-          <span className="org-monogram">B</span>
+        <NavLink to="/" className="workspace-label" aria-label="Burrow">
+          <BrandMark />
           <div>
             <strong>Burrow</strong>
             <small>{t("admin")}</small>
           </div>
           <span className="status-dot" />
-        </div>
+        </NavLink>
         <nav>
           {(["workspace", "identity", "connections"] as const).map((group) => {
             const items = navigation.filter(
