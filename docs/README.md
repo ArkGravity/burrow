@@ -3,6 +3,8 @@
 Start with the root [README](../README.md) for local development, common Make
 targets and Docker Compose deployment.
 
+A [Simplified Chinese introduction and setup guide](../README_zh.md) is also available.
+
 ## Development
 
 - [Project conventions](../AGENTS.md)

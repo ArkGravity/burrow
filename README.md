@@ -1,10 +1,16 @@
 <img src="web/public/logo.svg" alt="Burrow logo" width="64" height="64" />
 
-# burrow
+# Burrow
+
+English · [简体中文](README_zh.md)
 
 A lightweight, single-organization OpenID Connect identity provider: shared SSO
 sessions, password and mandatory TOTP authentication, users, groups, roles, permissions and
 application access. The Go backend and React web UI ship as one `burrow` binary.
+
+Burrow helps small teams and operators of self-hosted services manage accounts
+and application access in one place. It is inspired by Casdoor and independently
+implemented, with a focused OIDC scope and a single-instance deployment.
 
 - Repository: https://github.com/ArkGravity/burrow
 - [Configuration](configs/config.yaml) · [Documentation](docs/README.md) · [Project conventions](AGENTS.md) · [OIDC examples](examples/README.md)
@@ -16,6 +22,32 @@ Burrow uses the [MIT license](LICENSE). [Version `v0.1.0`](https://github.com/Ar
 see [release notes](docs/releases/v0.1.0.md), [installation instructions](docs/releases/INSTALL.md)
 and the [changelog](CHANGELOG.md) for Linux amd64 binaries, container images and
 deployment packages.
+
+## Features
+
+- **Shared SSO:** connect Web and SPA applications with OpenID Connect and PKCE S256.
+- **Password and MFA:** mandatory TOTP, temporary-password changes and administrator recovery.
+- **Access management:** users, groups, custom roles, permissions and audited management operations.
+- **Application portal:** users see the applications they are allowed to access.
+- **Simple deployment:** one binary with an embedded UI, or Docker Compose with PostgreSQL; no Redis or queue.
+- **Localized UI:** English and Simplified Chinese, with light, dark and system themes.
+
+For a first installation, use the [v0.1.0 installation guide](docs/releases/INSTALL.md).
+For downstream integrations, see the [Web and SPA examples](examples/README.md)
+and [Grafana, Nightingale and Harbor setup](examples/local-sso/README.md).
+
+## Screenshots
+
+Real screenshots of the maintainer's deployed instance, captured on October 2, 2026. The overview shows its current application assignment state.
+
+![Burrow overview and application portal in dark mode](docs/screenshots/overview-dark.png)
+
+<details>
+<summary>Role management</summary>
+
+![Burrow role management in dark mode](docs/screenshots/roles-dark.png)
+
+</details>
 
 ## Layout
 
