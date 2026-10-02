@@ -23,7 +23,7 @@ func TestApplicationPermissionLabels(t *testing.T) {
 			b.DB.Create(&role)
 			b.DB.Create(&RolePermission{RoleID: role.ID, PermissionID: "permissions:read"})
 			h, _ := passwordHash(testPassword)
-			user := User{ID: random(18), Username: "reader", PasswordHash: h, Enabled: true, LocalEnabled: true}
+			user := User{ID: random(18), Username: "reader", PasswordHash: h, Enabled: true}
 			b.DB.Create(&user)
 			b.DB.Create(&UserRole{UserID: user.ID, RoleID: role.ID})
 			reader := newBrowser(b)

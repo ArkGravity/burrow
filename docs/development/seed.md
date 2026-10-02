@@ -22,7 +22,7 @@ bootstrap password on a repeat seed.
 ## Roles and application grants
 
 Administrator (`admin`) is the only seeded built-in role. Its ID grants
-administrator behavior, subject to account/application/source checks. The built-in
+administrator behavior, subject to account/application/session checks. The built-in
 flag alone does not grant administrator privilege. Administrator cannot be edited
 or deleted.
 
@@ -58,8 +58,12 @@ Back up the database and retain its master key before upgrading. Stop the old
 server, migrate with the new binary, seed, then start the new server. Older binaries
 reject schema v3; use the pre-upgrade backup for rollback.
 
+Schema v4 subsequently removes upstream authentication; see
+[password-only upgrade](../operations/recovery.md#upgrade-to-password-only-authentication).
+
 ## New-user defaults and group display
 
+Creating a user requires a temporary password and forces a password change.
 The creation form does not preselect a role. Omitted `roleIds` and an explicit empty
 array both create a user with no roles; updates never add default roles. A valid
 session grants access to personal resources and the authorized application portal,

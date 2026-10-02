@@ -18,6 +18,9 @@ test("administrator provisions access and ordinary users see only their portal",
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
   await page.goto("/login");
+  await expect(page.getByText("Or continue with", { exact: true })).toHaveCount(
+    0,
+  );
   await page.getByLabel("Username", { exact: true }).fill("admin");
   await page
     .getByLabel("Password", { exact: true })
@@ -42,12 +45,18 @@ test("administrator provisions access and ordinary users see only their portal",
   await expect(
     page.getByRole("heading", { name: "Your workspace, connected." }),
   ).toBeVisible();
+  await expect(
+    page.getByRole("link", { name: "Providers", exact: true }),
+  ).toHaveCount(0);
   await page.getByRole("link", { name: "Users", exact: true }).click();
   await page.getByRole("button", { name: "Create", exact: true }).click();
   await expect(
     page
       .locator(".ant-drawer .ant-select-selection-item")
       .filter({ hasText: "Viewer" }),
+  ).toHaveCount(0);
+  await expect(
+    page.getByRole("switch", { name: "Local password login", exact: true }),
   ).toHaveCount(0);
   await page.getByLabel("Username", { exact: true }).fill("alice");
   await page.getByLabel("Name", { exact: true }).fill("Alice");
@@ -65,6 +74,12 @@ test("administrator provisions access and ordinary users see only their portal",
   ).toEqual([]);
   await page.getByRole("link", { name: "Applications", exact: true }).click();
   await page.getByRole("button", { name: "Create", exact: true }).click();
+  await expect(
+    page.getByLabel("Allowed providers", { exact: true }),
+  ).toHaveCount(0);
+  await expect(
+    page.getByRole("switch", { name: "Local password login", exact: true }),
+  ).toHaveCount(0);
   await page.getByLabel("Name", { exact: true }).fill("Engineering");
   await page
     .getByLabel("Client ID", { exact: true })
@@ -205,7 +220,6 @@ test("independent Web and SPA OIDC clients share SSO and complete RP logout", as
         name,
         clientType: type,
         enabled: true,
-        localEnabled: true,
         loginUrl: `http://localhost:${port}/login`,
         redirectUris: [`http://localhost:${port}/callback`],
         postLogoutRedirectUris: [`http://localhost:${port}/`],
@@ -267,7 +281,18 @@ test("independent Web and SPA OIDC clients share SSO and complete RP logout", as
         }
       })
       .toBe(200);
+    const logout = await page.request.post("/api/v1/auth/logout", {
+      headers: { "X-CSRF-Token": csrf },
+    });
+    expect(logout.status()).toBe(200);
     await page.goto("http://localhost:19001/login");
+    await expect(page).toHaveURL(/localhost:18080\/login\?requestId=/);
+    await expect(page.getByText("Web interop", { exact: true })).toBeVisible();
+    await page.getByLabel("Username", { exact: true }).fill("admin");
+    await page
+      .getByLabel("Password", { exact: true })
+      .fill("Changed-admin-password-2026");
+    await page.getByRole("button", { name: "Sign in", exact: true }).click();
     await expect(page).toHaveURL(/localhost:19001\/callback/);
     await expect(page.locator("body")).toContainText(
       "OIDC code + PKCE verified with coreos/go-oidc",

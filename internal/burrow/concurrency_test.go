@@ -60,11 +60,11 @@ func TestPasswordCannotOverwriteConcurrentReset(t *testing.T) {
 		t.Fatal("concurrent reset accepted stale password")
 	}
 }
-func TestIdentityCannotAttachToPromotedAdmin(t *testing.T) {
+func TestPasswordCannotResetPromotedAdmin(t *testing.T) {
 	b, _, _ := testServer(t, "sqlite")
 	h, _ := passwordHash(testPassword)
-	operator := User{ID: random(18), Username: "operator", Enabled: true, LocalEnabled: true, PasswordHash: h}
-	target := User{ID: random(18), Username: "target", Enabled: true, LocalEnabled: true, PasswordHash: h}
+	operator := User{ID: random(18), Username: "operator", Enabled: true, PasswordHash: h}
+	target := User{ID: random(18), Username: "target", Enabled: true, PasswordHash: h}
 	for _, u := range []User{operator, target} {
 		if err := b.DB.Create(&u).Error; err != nil {
 			t.Fatal(err)
@@ -74,19 +74,19 @@ func TestIdentityCannotAttachToPromotedAdmin(t *testing.T) {
 	b.DB.Create(&role)
 	b.DB.Create(&RolePermission{RoleID: role.ID, PermissionID: "users:write"})
 	b.DB.Create(&UserRole{UserID: operator.ID, RoleID: role.ID})
-	p := Provider{ID: random(18), Name: "upstream", Issuer: "https://issuer.example", ClientID: "rp", Enabled: true}
-	b.DB.Create(&p)
 	c := newBrowser(b)
 	c.login(t, operator.Username, testPassword)
-	w := interleave(c, "POST", "/api/v1/users/"+target.ID+"/identities", `{"providerId":"`+p.ID+`","subject":"attacker"}`, func() {
+	w := interleave(c, "PUT", "/api/v1/users/"+target.ID+"/password", `{"password":"attacker-password-2026"}`, func() {
 		if err := b.DB.Create(&UserRole{UserID: target.ID, RoleID: "admin"}).Error; err != nil {
 			t.Fatal(err)
 		}
 	})
-	var n int64
-	b.DB.Model(&ExternalIdentity{}).Where("user_id = ?", target.ID).Count(&n)
-	if n != 0 || w.Code != 403 {
-		t.Fatalf("promoted admin compromised: status=%d identities=%d", w.Code, n)
+	var current User
+	if err := b.DB.First(&current, "id = ?", target.ID).Error; err != nil {
+		t.Fatal(err)
+	}
+	if current.PasswordHash != h || w.Code != 403 {
+		t.Fatalf("promoted admin password reset: status=%d", w.Code)
 	}
 }
 

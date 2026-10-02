@@ -9,7 +9,7 @@ func TestCustomRolesMigration(t *testing.T) {
 	for _, driver := range []string{"sqlite", "postgres"} {
 		for _, scenario := range []string{"empty-viewer", "assigned-editor", "unused-editor", "assigned-viewer-permission", "custom-role", "audit-rollback"} {
 			t.Run(driver+"/"+scenario, func(t *testing.T) {
-				s := testStore(t, driver)
+				s := testLegacyStore(t, driver, 2)
 				role := Role{ID: "viewer", Name: "Viewer", Builtin: true}
 				if scenario == "assigned-editor" || scenario == "unused-editor" {
 					role.ID = "editor"
@@ -21,9 +21,9 @@ func TestCustomRolesMigration(t *testing.T) {
 				if err := s.DB.Create(&role).Error; err != nil {
 					t.Fatal(err)
 				}
-				user := User{ID: random(18), Username: "legacy", Enabled: true}
+				user := User{ID: random(18), Username: "legacy", Enabled: true, PasswordHash: "legacy-hash"}
 				group := Group{ID: random(18), Name: "legacy-group"}
-				s.DB.Create(&user)
+				createLegacyUser(t, s, user, true)
 				s.DB.Create(&group)
 				s.DB.Create(&GroupMember{UserID: user.ID, GroupID: group.ID})
 				if scenario != "unused-editor" {

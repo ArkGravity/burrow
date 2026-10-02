@@ -36,9 +36,5 @@ oidc:
   auth_code_ttl: 60s
   login_ttl: 10m
 
-providers:
-  allowed_cidrs: []
-  allow_private: false
-
 audit:
   retention: 2160h

@@ -22,7 +22,6 @@ import {
   EditOutlined,
   DeleteOutlined,
   KeyOutlined,
-  LinkOutlined,
   StopOutlined,
 } from "@ant-design/icons";
 import { api, write, APIError, type Row, type List } from "../lib/api";
@@ -56,11 +55,11 @@ const definitions: Record<
       { key: "name", label: "name", required: true },
       { key: "email", label: "email" },
       { key: "enabled", label: "enabled", type: "switch" },
-      { key: "localEnabled", label: "localEnabled", type: "switch" },
       {
         key: "password",
         label: "password",
         type: "password",
+        required: true,
         createOnly: true,
       },
       { key: "roleIds", label: "roleIds", type: "multi", source: "roles" },
@@ -132,25 +131,7 @@ const definitions: Record<
       },
       { key: "origins", label: "origins", type: "urls" },
       { key: "allowWithoutPkce", label: "allowWithoutPkce", type: "switch" },
-      { key: "localEnabled", label: "localEnabled", type: "switch" },
-      {
-        key: "providerIds",
-        label: "providerIds",
-        type: "multi",
-        source: "providers",
-      },
       { key: "roleIds", label: "roleIds", type: "multi", source: "roles" },
-    ],
-  },
-  providers: {
-    subtitle: "manageProviders",
-    permission: "providers:write",
-    fields: [
-      { key: "name", label: "name", required: true },
-      { key: "issuer", label: "issuer", required: true },
-      { key: "clientId", label: "clientId", required: true },
-      { key: "clientSecret", label: "clientSecret", type: "password" },
-      { key: "enabled", label: "enabled", type: "switch" },
     ],
   },
 };
@@ -171,7 +152,6 @@ export function Resources({ resource }: { resource: string }) {
   const [saving, setSaving] = useState(false);
   const [options, setOptions] = useState<Record<string, Row[]>>({});
   const [passwordUser, setPasswordUser] = useState<Row>();
-  const [identityUser, setIdentityUser] = useState<Row>();
   const [form] = Form.useForm();
   const clientType = Form.useWatch("clientType", form);
   const [passwordForm] = Form.useForm();
@@ -219,7 +199,6 @@ export function Resources({ resource }: { resource: string }) {
           )
         : {
             enabled: true,
-            localEnabled: true,
             clientType: "web",
             allowWithoutPkce: false,
           },
@@ -344,10 +323,7 @@ export function Resources({ resource }: { resource: string }) {
           },
         ]
       : []),
-    ...(resource === "providers"
-      ? [{ title: t("issuer"), dataIndex: "issuer", key: "issuer" }]
-      : []),
-    ...(["users", "applications", "providers"].includes(resource)
+    ...(["users", "applications"].includes(resource)
       ? [
           {
             title: t("status"),
@@ -387,13 +363,6 @@ export function Resources({ resource }: { resource: string }) {
                         passwordForm.resetFields();
                         setPasswordUser(row);
                       }}
-                    />
-                    <Button
-                      size="small"
-                      type="text"
-                      aria-label={t("identities")}
-                      icon={<LinkOutlined />}
-                      onClick={() => setIdentityUser(row)}
                     />
                     <Popconfirm
                       title={t("revokeSessions")}
@@ -450,11 +419,7 @@ export function Resources({ resource }: { resource: string }) {
       <div className="page-heading">
         <div>
           <div className="eyebrow">
-            {t(
-              ["applications", "providers"].includes(resource)
-                ? "connections"
-                : "identity",
-            )}
+            {t(resource === "applications" ? "connections" : "identity")}
           </div>
           <h1>{t(resource as TranslationKey)}</h1>
           <p>{t(def.subtitle)}</p>
@@ -666,115 +631,6 @@ export function Resources({ resource }: { resource: string }) {
           </Form.Item>
         </Form>
       </Modal>
-      {identityUser && (
-        <IdentityDrawer
-          user={identityUser}
-          onClose={() => setIdentityUser(undefined)}
-        />
-      )}
     </>
-  );
-}
-
-function IdentityDrawer({ user, onClose }: { user: Row; onClose: () => void }) {
-  const { t } = useI18n();
-  const { message } = App.useApp();
-  const [rows, setRows] = useState<Row[]>([]);
-  const [providers, setProviders] = useState<Row[]>([]);
-  const [form] = Form.useForm();
-  const load = useCallback(async () => {
-    try {
-      const result = await api<List | Row[]>(`/users/${user.id}/identities`);
-      setRows(Array.isArray(result) ? result : result.items);
-      const ps = await api<List>("/providers?pageSize=100");
-      setProviders(ps.items);
-    } catch (e) {
-      message.error(t(errorKey((e as APIError).code)));
-    }
-  }, [user.id]);
-  useEffect(() => {
-    void load();
-  }, [load]);
-  return (
-    <Drawer
-      open
-      title={`${t("identities")} · ${String(user.name || user.username)}`}
-      onClose={onClose}
-      size={520}
-    >
-      <Table
-        rowKey="id"
-        dataSource={rows}
-        pagination={false}
-        columns={[
-          {
-            title: t("providerId"),
-            dataIndex: "providerId",
-            render: (v) => String(providers.find((p) => p.id === v)?.name || v),
-          },
-          { title: t("subject"), dataIndex: "subject" },
-          {
-            title: t("actions"),
-            render: (_, r) => (
-              <Popconfirm
-                title={t("unlink")}
-                onConfirm={async () => {
-                  try {
-                    await api(`/users/${user.id}/identities/${r.id}`, {
-                      method: "DELETE",
-                    });
-                    await load();
-                  } catch (e) {
-                    message.error(t(errorKey((e as APIError).code)));
-                  }
-                }}
-              >
-                <Button danger size="small">
-                  {t("unlink")}
-                </Button>
-              </Popconfirm>
-            ),
-          },
-        ]}
-        locale={{ emptyText: t("noIdentities") }}
-      />
-      <Form
-        form={form}
-        layout="vertical"
-        className="spaced-form"
-        onFinish={async (v) => {
-          try {
-            await write(`/users/${user.id}/identities`, v);
-            form.resetFields();
-            await load();
-          } catch (e) {
-            message.error(t(errorKey((e as APIError).code)));
-          }
-        }}
-      >
-        <Form.Item
-          name="providerId"
-          label={t("providerId")}
-          rules={[{ required: true, message: t("required") }]}
-        >
-          <Select
-            options={providers.map((p) => ({
-              value: p.id,
-              label: String(p.name),
-            }))}
-          />
-        </Form.Item>
-        <Form.Item
-          name="subject"
-          label={t("subject")}
-          rules={[{ required: true, message: t("required") }]}
-        >
-          <Input />
-        </Form.Item>
-        <Button type="primary" htmlType="submit">
-          {t("link")}
-        </Button>
-      </Form>
-    </Drawer>
   );
 }

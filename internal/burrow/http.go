@@ -72,16 +72,13 @@ func NewServer(s *Store, assets ...fs.FS) (*Server, error) {
 	r.Get("/api/v1/auth/csrf", b.csrf)
 	r.Post("/api/v1/auth/login", b.login)
 	r.Post("/api/v1/auth/logout", b.logout)
-	r.Get("/api/v1/auth/providers", b.publicProviders)
 	r.Get("/api/v1/auth/context", b.authContext)
-	r.Get("/api/v1/auth/providers/{id}/login", b.upstreamLogin)
-	r.Get("/api/v1/auth/providers/{id}/callback", b.upstreamCallback)
 	r.Get("/api/v1/me", b.me)
 	r.Put("/api/v1/me", b.profile)
 	r.Post("/api/v1/me/password", b.changePassword)
 	r.Get("/api/v1/me/apps", b.myApps)
 	r.Get("/api/v1/dashboard", b.dashboard)
-	for _, resource := range []string{"users", "groups", "roles", "permissions", "applications", "providers"} {
+	for _, resource := range []string{"users", "groups", "roles", "permissions", "applications"} {
 		resource := resource
 		r.Get("/api/v1/"+resource, func(w http.ResponseWriter, r *http.Request) { b.list(w, r, resource) })
 		r.Post("/api/v1/"+resource, func(w http.ResponseWriter, r *http.Request) { b.mutate(w, r, resource) })
@@ -90,9 +87,6 @@ func NewServer(s *Store, assets ...fs.FS) (*Server, error) {
 	}
 	r.Put("/api/v1/users/{id}/password", b.resetPassword)
 	r.Post("/api/v1/users/{id}/revoke-sessions", b.revokeSessions)
-	r.Get("/api/v1/users/{id}/identities", b.identities)
-	r.Post("/api/v1/users/{id}/identities", b.identities)
-	r.Delete("/api/v1/users/{id}/identities/{identityId}", b.identities)
 	r.Post("/api/v1/applications/{id}/secret", b.resetSecret)
 	r.Get("/.well-known/openid-configuration", b.discovery)
 	r.Options("/.well-known/openid-configuration", b.discovery)
@@ -264,35 +258,16 @@ func (b *Server) limited(r *http.Request, bucket string) bool {
 	b.attempts[key] = a
 	return a.Count > 30
 }
-func (b *Server) newSession(w http.ResponseWriter, r *http.Request, u User, method, provider string, subject ...string) error {
-	return b.newSessionAt(w, r, u, method, provider, time.Now(), subject...)
-}
-func (b *Server) newSessionAt(w http.ResponseWriter, r *http.Request, u User, method, provider string, authTime time.Time, subject ...string) error {
+func (b *Server) newSession(w http.ResponseWriter, r *http.Request, u User) error {
 	credential := random(32)
-	s := Session{ID: random(18), UserID: u.ID, CredentialHash: hash(credential), Method: method, ProviderID: provider, AuthTime: authTime, ExpiresAt: time.Now().Add(b.Config.SessionTTL)}
+	s := Session{ID: random(18), UserID: u.ID, CredentialHash: hash(credential), Method: "password", AuthTime: time.Now(), ExpiresAt: time.Now().Add(b.Config.SessionTTL)}
 	err := b.DB.Transaction(func(tx *gorm.DB) error {
 		var current User
 		if e := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("id = ? AND enabled = ?", u.ID, true).First(&current).Error; e != nil {
 			return e
 		}
-		if method == "password" && (!current.LocalEnabled || current.PasswordHash != u.PasswordHash) {
+		if current.PasswordHash == "" || current.PasswordHash != u.PasswordHash {
 			return fmt.Errorf("authentication changed")
-		}
-		if method == "oidc" {
-			var p Provider
-			if e := tx.Where("id = ? AND enabled = ?", provider, true).First(&p).Error; e != nil {
-				return e
-			}
-			if len(subject) != 1 {
-				return fmt.Errorf("external subject missing")
-			}
-			var n int64
-			if e := tx.Model(&ExternalIdentity{}).Where("user_id = ? AND provider_id = ? AND issuer = ? AND subject = ?", u.ID, p.ID, p.Issuer, subject[0]).Count(&n).Error; e != nil {
-				return e
-			}
-			if n != 1 {
-				return fmt.Errorf("external identity changed")
-			}
 		}
 		if c, e := r.Cookie("burrow_session"); e == nil {
 			if e := tx.Model(&Session{}).Where("credential_hash = ?", hash(c.Value)).Update("revoked", true).Error; e != nil {
@@ -323,7 +298,7 @@ func (b *Server) login(w http.ResponseWriter, r *http.Request) {
 		encoded = b.dummyHash
 	}
 	valid := passwordOK(encoded, in.Password)
-	if e != nil || !valid || !u.Enabled || !u.LocalEnabled {
+	if e != nil || !valid || !u.Enabled {
 		b.event("", "", "login", requestID(r), false)
 		fail(w, r, 401, "invalid_credentials")
 		return
@@ -335,12 +310,12 @@ func (b *Server) login(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		var app Application
-		if b.DB.First(&app, "id = ?", a.ClientID).Error != nil || !app.Enabled || !app.LocalEnabled {
-			fail(w, r, 403, "authentication_method_denied")
+		if b.DB.First(&app, "id = ?", a.ClientID).Error != nil || !app.Enabled {
+			fail(w, r, 403, "invalid_application")
 			return
 		}
 	}
-	if e = b.newSession(w, r, u, "password", ""); e != nil {
+	if e = b.newSession(w, r, u); e != nil {
 		fail(w, r, 503, "unavailable")
 		return
 	}
@@ -424,7 +399,7 @@ func (b *Server) changePassword(w http.ResponseWriter, r *http.Request) {
 	if !decode(w, r, &in) {
 		return
 	}
-	if !u.LocalEnabled || !passwordOK(u.PasswordHash, in.CurrentPassword) {
+	if !passwordOK(u.PasswordHash, in.CurrentPassword) {
 		fail(w, r, 400, "invalid_credentials")
 		return
 	}
@@ -434,7 +409,7 @@ func (b *Server) changePassword(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	e = b.authorizationTx(r, "", func(tx *gorm.DB, current User, session Session) error {
-		if !current.LocalEnabled || current.PasswordHash != u.PasswordHash {
+		if current.PasswordHash != u.PasswordHash {
 			return errors.New("invalid_credentials")
 		}
 		if err := tx.Model(&User{}).Where("id = ? AND password_hash = ?", current.ID, u.PasswordHash).Updates(map[string]any{"password_hash": h, "must_change_password": false}).Error; err != nil {

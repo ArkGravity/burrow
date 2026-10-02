@@ -53,14 +53,8 @@ func (b *Server) sessionDB(db *gorm.DB, r *http.Request) (User, Session, error) 
 	if e = db.Where("id = ? AND enabled = ?", s.UserID, true).First(&u).Error; e != nil {
 		return u, s, e
 	}
-	if s.Method == "password" && !u.LocalEnabled {
-		return u, s, errors.New("local_login_disabled")
-	}
-	if s.Method == "oidc" {
-		var p Provider
-		if e = db.Where("id = ? AND enabled = ?", s.ProviderID, true).First(&p).Error; e != nil {
-			return u, s, e
-		}
+	if s.Method != "password" || u.PasswordHash == "" {
+		return u, s, errors.New("invalid_authentication_method")
 	}
 	return u, s, nil
 }

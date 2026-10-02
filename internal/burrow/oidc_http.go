@@ -193,24 +193,9 @@ func (b *Server) authError(w http.ResponseWriter, r *http.Request, a *authReques
 	u.RawQuery = q.Encode()
 	http.Redirect(w, r, u.String(), 302)
 }
-func (b *Server) publicProviders(w http.ResponseWriter, r *http.Request) {
-	items := []Provider{}
-	if e := b.DB.Where("enabled = ?", true).Find(&items).Error; e != nil {
-		fail(w, r, 503, "unavailable")
-		return
-	}
-	out := []map[string]string{}
-	for _, p := range items {
-		out = append(out, map[string]string{"id": p.ID, "name": p.Name})
-	}
-	write(w, 200, out)
-}
 func (b *Server) authContext(w http.ResponseWriter, r *http.Request) {
 	id := r.URL.Query().Get("requestId")
-	local := true
 	name := ""
-	var providers []Provider
-	q := b.DB.Where("enabled = ?", true)
 	if id != "" {
 		a, e := b.browserAuth(r, id)
 		if e != nil {
@@ -222,19 +207,9 @@ func (b *Server) authContext(w http.ResponseWriter, r *http.Request) {
 			fail(w, r, 400, "invalid_application")
 			return
 		}
-		local = app.LocalEnabled
 		name = app.Name
-		q = q.Where("id IN (SELECT provider_id FROM application_providers WHERE application_id = ?)", app.ID)
 	}
-	if e := q.Find(&providers).Error; e != nil {
-		fail(w, r, 503, "unavailable")
-		return
-	}
-	items := []map[string]string{}
-	for _, p := range providers {
-		items = append(items, map[string]string{"id": p.ID, "name": p.Name})
-	}
-	write(w, 200, map[string]any{"localEnabled": local, "providers": items, "applicationName": name})
+	write(w, 200, map[string]string{"applicationName": name})
 }
 func (b *Server) oidcLogout(w http.ResponseWriter, r *http.Request) {
 	if r.Method == "GET" {

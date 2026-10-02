@@ -25,10 +25,9 @@ import (
 
 type Config struct {
 	Bootstrap                                                   BootstrapConfig
-	ProviderAllowedCIDRs, TrustedProxies                        []netip.Prefix
+	TrustedProxies                                              []netip.Prefix
 	Env, ListenAddr, Issuer, DBDriver, DBDSN, StaticDir         string
 	MasterKey                                                   [32]byte
-	AllowPrivateProviders                                       bool
 	SessionTTL, TokenTTL, AuthCodeTTL, LoginTTL, EventRetention time.Duration
 }
 
@@ -90,7 +89,7 @@ func (s *Store) Migrate() error {
 		if err := tx.First(&v, 1).Error; err != nil {
 			return err
 		}
-		migrations := []string{initialMigration, pkceCompatibilityMigration, customRolesMigration}
+		migrations := []string{initialMigration, pkceCompatibilityMigration, customRolesMigration, removeUpstreamMigration}
 		if v.Version > len(migrations) {
 			return errors.New("database schema is newer than binary")
 		}
@@ -100,6 +99,11 @@ func (s *Store) Migrate() error {
 			}
 		}
 		for version := v.Version; version < len(migrations); version++ {
+			if version == 3 {
+				if err := checkPasswordLoginMigration(tx); err != nil {
+					return err
+				}
+			}
 			for _, statement := range strings.Split(migrations[version], ";") {
 				if strings.TrimSpace(statement) != "" {
 					if err := tx.Exec(statement).Error; err != nil {
@@ -119,7 +123,7 @@ func (s *Store) Health(ctx context.Context) error {
 	if err := s.DB.WithContext(ctx).First(&v, 1).Error; err != nil {
 		return err
 	}
-	if v.Version != 3 || v.Checksum != migrationChecksum(3) {
+	if v.Version != 4 || v.Checksum != migrationChecksum(4) {
 		return errors.New("migration required")
 	}
 	return nil
@@ -214,9 +218,9 @@ func contains(xs []string, x string) bool {
 	}
 	return false
 }
-func localAdminExists(tx *gorm.DB) error {
+func enabledAdminExists(tx *gorm.DB) error {
 	var users []User
-	if err := tx.Where("enabled = ? AND local_enabled = ? AND password_hash <> ?", true, true, "").Find(&users).Error; err != nil {
+	if err := tx.Where("enabled = ? AND password_hash <> ?", true, "").Find(&users).Error; err != nil {
 		return err
 	}
 	for _, u := range users {
@@ -228,7 +232,7 @@ func localAdminExists(tx *gorm.DB) error {
 			return nil
 		}
 	}
-	return errors.New("last_local_admin")
+	return errors.New("last_admin")
 }
 func (s *Store) event(actor, object, kind, request string, success bool) {
 	s.DB.Create(&Event{ID: random(18), ActorID: actor, ObjectID: object, Kind: kind, Success: success, RequestID: request, CreatedAt: time.Now()})
@@ -242,7 +246,7 @@ func (s *Store) Cleanup(ctx context.Context) {
 			return
 		case <-ticker.C:
 			now := time.Now()
-			for _, m := range []any{&Session{}, &AuthTransaction{}, &UpstreamTransaction{}, &TokenRecord{}} {
+			for _, m := range []any{&Session{}, &AuthTransaction{}, &TokenRecord{}} {
 				s.DB.Where("expires_at < ?", now).Delete(m)
 			}
 			s.DB.Where("created_at < ?", now.Add(-s.Config.EventRetention)).Delete(&Event{})
@@ -260,6 +264,25 @@ var pkceCompatibilityMigration string
 //go:embed migrations/003_custom_roles.sql
 var customRolesMigration string
 
+//go:embed migrations/004_remove_upstream.sql
+var removeUpstreamMigration string
+
+// Do not silently enable password login or lock out active upstream-only accounts.
+// Operators must prepare these accounts and applications using the old version.
+func checkPasswordLoginMigration(tx *gorm.DB) error {
+	var users, applications int64
+	if err := tx.Table("users").Where("enabled = ? AND (local_enabled = ? OR password_hash IS NULL OR password_hash = ?)", true, false, "").Count(&users).Error; err != nil {
+		return err
+	}
+	if err := tx.Table("applications").Where("enabled = ? AND local_enabled = ?", true, false).Count(&applications).Error; err != nil {
+		return err
+	}
+	if users > 0 || applications > 0 {
+		return fmt.Errorf("migration 004 requires password login for enabled users and applications (%d users, %d applications): use the previous version to configure passwords and enable local login, or disable unused records, before retrying", users, applications)
+	}
+	return nil
+}
+
 func migrationChecksum(version int) string {
 	if version == 1 {
 		return hash(initialMigration)
@@ -267,7 +290,10 @@ func migrationChecksum(version int) string {
 	if version == 2 {
 		return hash(initialMigration + pkceCompatibilityMigration)
 	}
-	return hash(initialMigration + pkceCompatibilityMigration + customRolesMigration)
+	if version == 3 {
+		return hash(initialMigration + pkceCompatibilityMigration + customRolesMigration)
+	}
+	return hash(initialMigration + pkceCompatibilityMigration + customRolesMigration + removeUpstreamMigration)
 }
 
 func (c *Config) defaults() {

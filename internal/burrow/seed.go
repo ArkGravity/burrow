@@ -87,7 +87,7 @@ func (s *Store) Seed(options BootstrapConfig) error {
 		if options.Name == "" {
 			options.Name = "Administrator"
 		}
-		user = User{ID: random(18), Username: options.Username, Name: options.Name, Email: options.Email, Enabled: true, LocalEnabled: true,
+		user = User{ID: random(18), Username: options.Username, Name: options.Name, Email: options.Email, Enabled: true,
 			PasswordHash: h, MustChangePassword: true, Language: "en", Theme: "system"}
 		if err := tx.Create(&user).Error; err != nil {
 			return err

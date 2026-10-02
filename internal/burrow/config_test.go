@@ -95,6 +95,7 @@ func TestConfigFileAndEnvironmentPrecedence(t *testing.T) {
 func TestConfigRejectsInvalidValues(t *testing.T) {
 	for name, document := range map[string]string{
 		"unknown":                "server:\n  typo: value\n",
+		"removed providers":      "providers:\n  allowed_cidrs: []\n  allow_private: false\n",
 		"duration":               "session:\n  ttl: -1s\n",
 		"cidr":                   "server:\n  trusted_proxies: [invalid]\n",
 		"driver":                 "database:\n  driver: invalid\n",

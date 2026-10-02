@@ -1,5 +1,15 @@
 # 协议与回归验证记录
 
+## 上游 Provider 移除（2026-10-02）
+
+- 在 `feat/remove-upstream-providers` 分支移除上游 OIDC、Provider 管理、外部身份关联和用户/应用认证来源配置；保留下游 Applications、共享 SSO、应用授权和 PKCE 策略。当前 schema 为 v4，历史迁移 001–003 未修改。
+- 迁移 004 在同一事务内清理上游数据与 Provider 权限、撤销非密码来源会话/Token 和未完成授权，并记录审计。启用用户需要密码且用户/应用必须允许本地登录，否则迁移拒绝并回滚。升级须先在旧版本准备这些记录；禁用的无密码账号保留，管理员可重置密码后显式启用。当前 MFA 尚未实现，[方案](../development/mfa-proposal.md) 供用户评估。
+- 使用临时 PostgreSQL 17 容器的独立数据库和测试隔离 schema，`make test-db lint` 通过完整 SQLite/PostgreSQL race 测试和 Go 静态检查。针对迁移和密码认证的双数据库 race 测试也通过，覆盖旧 schema v1/v2/v3 升级、数据/密钥/授权保留、错误迁移拒绝、审计失败回滚、旧上游 API 与字段拒绝、禁用旧账号恢复、未知认证来源在 API/授权/换码/UserInfo 的拒绝。
+- `make web-check` 通过类型检查和两条单元测试。`make test-e2e` 通过三条 Chromium 流程，包括移除旧 UI 入口、用户临时密码改密、从独立 Web 应用发起的密码登录、Web/SPA 共享 SSO 和 RP 退出，以及独立 Web 客户端的单应用无 PKCE 兼容。浏览器运行器构建并运行嵌入前端的 Go 二进制。
+- `make compose-config COMPOSE_ENV=.env.example` 静默校验通过。格式、当前文档的本地链接和 `git diff --check` 通过。本轮未构建 Burrow 容器镜像、部署生产、重新部署 Grafana/Nightingale/Harbor 或验证远端 CI。此前三应用用户验收和以下旧版本测试记录仍是历史检查点，不代表本轮重新验收。
+
+## 历史检查点
+
 本记录对应 2026-09-28 的本地验收，使用版本见 [依赖文档](../development/dependencies.md)。这是工程回归与互操作验证，不是 OpenID Foundation 官方一致性认证。
 
 ## 已验证范围

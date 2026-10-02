@@ -8,7 +8,7 @@ executable documentation when historical design records disagree with them.
 Burrow is an independently implemented, lightweight, single-organization OIDC
 identity provider inspired by Casdoor. Keep the implementation focused on shared
 SSO, personal profiles, application portals, users, groups, roles, permissions,
-application configuration and upstream OIDC providers.
+application configuration and Burrow password authentication.
 
 - Preserve the single-instance modular monolith. Avoid additional middleware,
   Redis, queues or deployment components without a concrete requirement.
@@ -40,8 +40,7 @@ migration is explicitly part of the task.
 | `internal/burrow/admin.go`, `mutation.go`         | Management APIs, transactional authorization and auditing             |
 | `internal/burrow/http.go`                         | Authentication, sessions, personal resources, portal and HTTP routing |
 | `internal/burrow/oidc_storage.go`, `oidc_http.go` | Downstream OIDC storage and protocol handlers                         |
-| `internal/burrow/upstream.go`                     | Upstream OIDC transactions and linked identities                      |
-| `internal/burrow/network.go`, `cors.go`           | Proxy trust, Provider network restrictions and browser origins        |
+| `internal/burrow/network.go`, `cors.go`           | Proxy trust and browser origins                                       |
 | `internal/burrow/migrations/`                     | Explicit, checksummed SQL migrations                                  |
 | `web/src/main.tsx`, `pages/`                      | UI layout, authentication, home and resource management               |
 | `web/src/lib/`, `components/`                     | API/session/access helpers, translations and shared components        |
@@ -57,14 +56,14 @@ frontend with `-tags embedweb`; build `web/dist` first, normally through
 
 - Authenticate against the current enabled user and valid shared session.
   Enforce management permissions on the server; UI visibility is supplementary.
-- Recheck user, application and authentication-source access during both OIDC
+- Recheck user, application and session access during both OIDC
   authorization and authorization-code exchange.
 - Effective permissions combine direct user roles and group roles. There are no
   nested groups or inherited roles. The Administrator role ID grants administrator
   access; the `Builtin` flag alone must never grant that privilege.
-- Protect the last enabled local administrator. Require `authorization:write`
+- Protect the last enabled administrator with a password. Require `authorization:write`
   for explicit authorization relationship changes. `users:write` alone must not
-  enable promotion, administrator password reset or administrator identity linking.
+  enable promotion or administrator password reset.
 - Preserve transactional mutation handling: serialize decisions and writes,
   revalidate the actor's current permissions within the transaction, and commit
   the audit record with the mutation. Audit failure must roll back the mutation.
@@ -77,7 +76,7 @@ frontend with `-tags embedweb`; build `web/dist` first, normally through
 
 ## OIDC boundaries
 
-- Continue using `zitadel/oidc/v3` through the existing OP/RP adapters.
+- Continue using `zitadel/oidc/v3` through the existing OP adapter.
 - Support Authorization Code with PKCE S256 required by default. Administrators
   may allow a specific Web application to omit PKCE using `allowWithoutPkce`;
   SPA clients always require PKCE. Submitted PKCE must always be validated and
@@ -86,13 +85,11 @@ frontend with `-tags embedweb`; build `web/dist` first, normally through
   wildcard redirects or permissive CORS.
 - Preserve browser-bound state, nonce and PKCE transactions, expiry checks and
   atomic one-time authorization-code consumption.
-- Upstream identities require a pre-linked Provider, issuer and subject. Do not
-  provision users automatically or match accounts by email. Preserve fresh
-  upstream authentication and `auth_time` validation.
-- Restrict Provider network access and trust forwarded addresses only from
-  configured proxy CIDRs. Do not globally allow private Provider networks in
-  production.
-- Keep downstream client secrets hashed and Provider secrets/private signing keys
+- Authenticate users with Burrow passwords. Upstream Providers, external identity
+  linking and per-user/application authentication-source settings were removed.
+  Do not restore these features without an explicit requirement.
+- Trust forwarded addresses only from configured proxy CIDRs.
+- Keep downstream client secrets hashed and private signing keys
   encrypted with the existing master key. Preserve signing keys across restarts
   and historical public keys during rotation.
 - Burrow logout revokes its shared session. Applications own their sessions;
@@ -109,7 +106,7 @@ profiles, account states and user assignments. Reject reserved-role conflicts
 and an existing bootstrap username that is not already an administrator.
 
 - **Administrator:** all management and application access, subject to account,
-  application and authentication-source restrictions.
+  application and session restrictions.
   Administrator is the only seeded built-in role and is immutable. Application-login
   permissions belong to ordinary roles assigned to users or groups. Do not attach
   blanket APP permissions to built-in roles. New users have no roles by default;
@@ -145,6 +142,12 @@ the full Groups API. Avoid per-user membership queries.
   `.env.example`, Compose, tests and documentation as applicable.
 - Use explicit migrations, not runtime AutoMigrate. Never edit an applied
   checksummed migration. New versions also require corresponding migrator support.
+- Migration 004 removes upstream authentication and Provider grants, revokes
+  non-password sessions/tokens and removes their outstanding authorizations.
+  Active users need a password and active users/applications must allow local
+  login before upgrading; otherwise migration refuses and rolls back. Prepare
+  them in the previous version or disable unused records. Preserve disabled
+  users without passwords; reset their password before explicitly enabling them.
 - Startup order is migration, seed, then server. Keep readiness and signing-key
   validation meaningful. Compose shutdown must preserve database volumes.
 
@@ -193,8 +196,8 @@ when using local overrides. Inspect `make help` for available actions.
   root Compose or clearing existing databases. Burrow uses dev SQLite; Grafana,
   Nightingale and Harbor are reached through the example Nginx.
 - Create downstream Applications manually in Burrow and grant login permissions
-  through ordinary roles assigned to users or groups. Providers represent upstream
-  identity sources and are not used to configure these downstream applications.
+  through ordinary roles assigned to users or groups. Burrow authenticates these
+  users with passwords; upstream Providers are no longer supported.
 - Grafana and Harbor retain PKCE S256 enforcement. Only the Nightingale v9.1.1
   Web application uses `allowWithoutPkce`; this exception must not become global.
 - Configure Nightingale and Harbor OIDC manually in their own UIs using the

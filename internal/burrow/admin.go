@@ -42,8 +42,6 @@ func (b *Server) list(w http.ResponseWriter, r *http.Request, resource string) {
 		out = &[]Permission{}
 	case "applications":
 		out = &[]Application{}
-	case "providers":
-		out = &[]Provider{}
 	}
 	q := b.DB.Model(out)
 	if search := r.URL.Query().Get("search"); search != "" {
@@ -54,7 +52,7 @@ func (b *Server) list(w http.ResponseWriter, r *http.Request, resource string) {
 			q = q.Where("LOWER(name) LIKE ?", pattern)
 		}
 	}
-	if status := r.URL.Query().Get("enabled"); status != "" && (resource == "users" || resource == "applications" || resource == "providers") {
+	if status := r.URL.Query().Get("enabled"); status != "" && (resource == "users" || resource == "applications") {
 		q = q.Where("enabled = ?", status == "true")
 	}
 	var total int64
@@ -156,9 +154,7 @@ func (b *Server) hydrateUsers(tx *gorm.DB, users []User) error {
 	return nil
 }
 func (b *Server) hydrateApp(tx *gorm.DB, a *Application) {
-	a.ProviderIDs = []string{}
 	a.RoleIDs = []string{}
-	tx.Model(&ApplicationProvider{}).Where("application_id = ?", a.ID).Pluck("provider_id", &a.ProviderIDs)
 	tx.Model(&RolePermission{}).Where("permission_id = ?", "app:"+a.ID+":login").Pluck("role_id", &a.RoleIDs)
 }
 func rawString(in map[string]json.RawMessage, k string) string {
@@ -215,11 +211,10 @@ func (b *Server) mutate(w http.ResponseWriter, r *http.Request, resource string)
 	delete(in, "id")
 	delete(in, "builtin")
 	allowed := map[string][]string{
-		"users":        {"username", "name", "email", "enabled", "localEnabled", "mustChangePassword", "language", "theme", "password", "roleIds", "groupIds"},
+		"users":        {"username", "name", "email", "enabled", "mustChangePassword", "language", "theme", "password", "roleIds", "groupIds"},
 		"groups":       {"name", "description", "userIds", "roleIds"},
 		"roles":        {"name", "description", "permissionIds"},
-		"applications": {"name", "clientId", "clientSecret", "clientType", "enabled", "icon", "loginUrl", "redirectUris", "postLogoutRedirectUris", "origins", "localEnabled", "allowWithoutPkce", "providerIds", "roleIds"},
-		"providers":    {"name", "issuer", "clientId", "clientSecret", "enabled"},
+		"applications": {"name", "clientId", "clientSecret", "clientType", "enabled", "icon", "loginUrl", "redirectUris", "postLogoutRedirectUris", "origins", "allowWithoutPkce", "roleIds"},
 	}
 	for k := range in {
 		if !contains(allowed[resource], k) {
@@ -268,7 +263,7 @@ func (b *Server) mutate(w http.ResponseWriter, r *http.Request, resource string)
 			if err := b.deleteResource(tx, resource, id, admin, contains(p, "authorization:write")); err != nil {
 				return err
 			}
-			if e := localAdminExists(tx); e != nil {
+			if e := enabledAdminExists(tx); e != nil {
 				return e
 			}
 			return tx.Create(&Event{ID: random(18), ActorID: actor.ID, ObjectID: id, Kind: resource + ":" + strings.ToLower(r.Method), RequestID: requestID(r), Success: true, CreatedAt: time.Now()}).Error
@@ -276,7 +271,7 @@ func (b *Server) mutate(w http.ResponseWriter, r *http.Request, resource string)
 		data, _ := json.Marshal(in)
 		switch resource {
 		case "users":
-			u := User{ID: id, Enabled: true, LocalEnabled: true, MustChangePassword: true, Language: "en", Theme: "system"}
+			u := User{ID: id, Enabled: true, MustChangePassword: true, Language: "en", Theme: "system"}
 			if !creating {
 				if err := guardAdminTarget(tx, actor, id); err != nil {
 					return err
@@ -301,7 +296,7 @@ func (b *Server) mutate(w http.ResponseWriter, r *http.Request, resource string)
 				return invalid("profile")
 			}
 			_, passwordProvided := in["password"]
-			if (creating && u.LocalEnabled) || passwordProvided {
+			if creating || passwordProvided {
 				h, err := passwordHash(rawString(in, "password"))
 				if err != nil {
 					return err
@@ -309,11 +304,8 @@ func (b *Server) mutate(w http.ResponseWriter, r *http.Request, resource string)
 				u.PasswordHash = h
 				u.MustChangePassword = true
 			}
-			if u.LocalEnabled && u.PasswordHash == "" {
+			if u.Enabled && u.PasswordHash == "" {
 				return invalid("password")
-			}
-			if !u.LocalEnabled {
-				u.MustChangePassword = false
 			}
 			if err := tx.Save(&u).Error; err != nil {
 				return err
@@ -374,7 +366,7 @@ func (b *Server) mutate(w http.ResponseWriter, r *http.Request, resource string)
 			}
 			result = v
 		case "applications":
-			v := Application{ID: id, ClientID: random(18), ClientType: "web", Enabled: true, LocalEnabled: true, RedirectURLs: []string{}, LogoutURLs: []string{}, Origins: []string{}}
+			v := Application{ID: id, ClientID: random(18), ClientType: "web", Enabled: true, RedirectURLs: []string{}, LogoutURLs: []string{}, Origins: []string{}}
 			if !creating {
 				if err := tx.First(&v, "id = ?", id).Error; err != nil {
 					return err
@@ -469,47 +461,8 @@ func (b *Server) mutate(w http.ResponseWriter, r *http.Request, resource string)
 			}
 			b.hydrateApp(tx, &v)
 			result = v
-		case "providers":
-			v := Provider{ID: id, Enabled: true}
-			if !creating {
-				if err := tx.First(&v, "id = ?", id).Error; err != nil {
-					return err
-				}
-			}
-			issuer := v.Issuer
-			if err := json.Unmarshal(data, &v); err != nil {
-				return invalid("request")
-			}
-			v.Issuer = strings.TrimRight(v.Issuer, "/")
-			if v.Name == "" || v.ClientID == "" {
-				return invalid("provider")
-			}
-			if err := b.validateProviderURL(v.Issuer); err != nil {
-				return err
-			}
-			if !creating && issuer != v.Issuer {
-				var n int64
-				tx.Model(&ExternalIdentity{}).Where("provider_id = ?", id).Count(&n)
-				if n > 0 {
-					return errors.New("provider_issuer_immutable")
-				}
-			}
-			if _, found := in["clientSecret"]; found {
-				encrypted, err := b.seal(rawString(in, "clientSecret"))
-				if err != nil {
-					return err
-				}
-				v.SecretCipher = encrypted
-			}
-			if v.SecretCipher == "" {
-				return invalid("client_secret")
-			}
-			if err := tx.Save(&v).Error; err != nil {
-				return err
-			}
-			result = v
 		}
-		if e := localAdminExists(tx); e != nil {
+		if e := enabledAdminExists(tx); e != nil {
 			return e
 		}
 		return tx.Create(&Event{ID: random(18), ActorID: actor.ID, ObjectID: id, Kind: resource + ":" + strings.ToLower(r.Method), RequestID: requestID(r), Details: auditDetails, Success: true, CreatedAt: time.Now()}).Error
@@ -526,9 +479,9 @@ func (b *Server) mutate(w http.ResponseWriter, r *http.Request, resource string)
 			code = "conflict"
 		} else if code == "forbidden" {
 			status = 403
-		} else if contains([]string{"in_use", "provider_issuer_immutable", "last_local_admin", "builtin_role"}, code) {
+		} else if contains([]string{"in_use", "last_admin", "builtin_role"}, code) {
 			status = 409
-		} else if !strings.HasPrefix(code, "invalid_") && !contains([]string{"last_local_admin", "builtin_role", "forbidden", "in_use", "provider_issuer_immutable", "password_policy"}, code) {
+		} else if !strings.HasPrefix(code, "invalid_") && !contains([]string{"last_admin", "builtin_role", "forbidden", "in_use", "password_policy"}, code) {
 			status = 503
 			code = "unavailable"
 		}
@@ -563,28 +516,6 @@ func (b *Server) validateURL(raw string, origin bool) error {
 	return nil
 }
 func (b *Server) assign(tx *gorm.DB, resource, id string, in map[string]json.RawMessage, admin bool) error {
-	if _, ok := in["providerIds"]; ok {
-		if resource != "applications" {
-			return invalid("providerIds")
-		}
-		ids, e := rawIDs(in, "providerIds")
-		if e != nil {
-			return e
-		}
-		for _, pid := range ids {
-			if e := exists(tx, &Provider{}, pid); e != nil {
-				return e
-			}
-		}
-		if e := tx.Where("application_id = ?", id).Delete(&ApplicationProvider{}).Error; e != nil {
-			return e
-		}
-		for _, pid := range ids {
-			if e := tx.Create(&ApplicationProvider{ApplicationID: id, ProviderID: pid}).Error; e != nil {
-				return e
-			}
-		}
-	}
 	if raw, ok := in["roleIds"]; ok {
 		ids, e := rawIDs(in, "roleIds")
 		if e != nil {
@@ -753,11 +684,6 @@ func (b *Server) deleteResource(tx *gorm.DB, resource, id string, admin, canAuth
 			return errors.New("in_use")
 		}
 		return tx.Delete(&Role{}, "id = ?", id).Error
-	case "providers":
-		if count(&ExternalIdentity{}, "provider_id = ?") || count(&ApplicationProvider{}, "provider_id = ?") {
-			return errors.New("in_use")
-		}
-		return tx.Delete(&Provider{}, "id = ?", id).Error
 	case "users":
 		ids, e := roleIDs(tx, id)
 		if e != nil {
@@ -769,7 +695,7 @@ func (b *Server) deleteResource(tx *gorm.DB, resource, id string, admin, canAuth
 		if contains(ids, "admin") && !admin {
 			return errors.New("forbidden")
 		}
-		for _, m := range []any{&UserRole{}, &GroupMember{}, &ExternalIdentity{}} {
+		for _, m := range []any{&UserRole{}, &GroupMember{}} {
 			if e := tx.Where("user_id = ?", id).Delete(m).Error; e != nil {
 				return e
 			}
@@ -796,9 +722,6 @@ func (b *Server) deleteResource(tx *gorm.DB, resource, id string, admin, canAuth
 			return e
 		}
 		if e := tx.Where("application_id = ?", id).Delete(&Permission{}).Error; e != nil {
-			return e
-		}
-		if e := tx.Where("application_id = ?", id).Delete(&ApplicationProvider{}).Error; e != nil {
 			return e
 		}
 		if e := tx.Where("client_id = ?", id).Delete(&AuthTransaction{}).Error; e != nil {
@@ -864,67 +787,6 @@ func (b *Server) revokeSessions(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	write(w, 200, map[string]bool{"ok": true})
-}
-func (b *Server) identities(w http.ResponseWriter, r *http.Request) {
-	permission := "users:write"
-	if r.Method == "GET" {
-		permission = "users:read"
-	}
-	_, _, ok := b.require(w, r, permission)
-	if !ok {
-		return
-	}
-	id := chi.URLParam(r, "id")
-	if r.Method == "GET" {
-		items := []ExternalIdentity{}
-		if e := b.DB.Where("user_id = ?", id).Find(&items).Error; e != nil {
-			mutationError(w, r, e)
-			return
-		}
-		write(w, 200, map[string]any{"items": items, "total": len(items), "page": 1, "pageSize": len(items)})
-		return
-	}
-	var in struct{ ProviderID, Subject string }
-	if r.Method != "DELETE" && !decode(w, r, &in) {
-		return
-	}
-	if r.Method != "DELETE" && (in.Subject == "" || len(in.Subject) > 255) {
-		fail(w, r, 400, "invalid_identity")
-		return
-	}
-	var identity ExternalIdentity
-	err := b.authorizationTx(r, "users:write", func(tx *gorm.DB, current User, _ Session) error {
-		if e := guardAdminTarget(tx, current, id); e != nil {
-			return e
-		}
-		if e := exists(tx, &User{}, id); e != nil {
-			return e
-		}
-		if r.Method == "DELETE" {
-			if e := tx.Where("user_id = ? AND id = ?", id, chi.URLParam(r, "identityId")).First(&identity).Error; e != nil {
-				return e
-			}
-			if e := tx.Delete(&identity).Error; e != nil {
-				return e
-			}
-			return tx.Model(&Session{}).Where("user_id = ? AND provider_id = ?", id, identity.ProviderID).Update("revoked", true).Error
-		}
-		var p Provider
-		if e := tx.First(&p, "id = ?", in.ProviderID).Error; e != nil {
-			return e
-		}
-		identity = ExternalIdentity{ID: random(18), ProviderID: p.ID, Issuer: p.Issuer, Subject: in.Subject, UserID: id}
-		return tx.Create(&identity).Error
-	})
-	if err != nil {
-		mutationError(w, r, err)
-		return
-	}
-	if r.Method == "DELETE" {
-		write(w, 200, map[string]bool{"ok": true})
-	} else {
-		write(w, 201, identity)
-	}
 }
 func (b *Server) resetSecret(w http.ResponseWriter, r *http.Request) {
 	_, _, ok := b.require(w, r, "applications:write")

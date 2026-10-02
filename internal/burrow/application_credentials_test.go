@@ -131,7 +131,7 @@ func TestApplicationCredentials(t *testing.T) {
 					b.DB.Create(&Role{ID: role, Name: "Application maintainer"})
 					b.DB.Create(&RolePermission{RoleID: role, PermissionID: "applications:write"})
 				}
-				u := User{ID: random(18), Username: role, PasswordHash: h, Enabled: true, LocalEnabled: true}
+				u := User{ID: random(18), Username: role, PasswordHash: h, Enabled: true}
 				if err := b.DB.Create(&u).Error; err != nil {
 					t.Fatal(err)
 				}

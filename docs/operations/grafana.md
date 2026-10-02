@@ -4,7 +4,7 @@
 
 ## 部署前检查
 
-- 升级 Burrow 前备份数据库并保留原 master key，按 [恢复与升级说明](recovery.md)操作。先迁移，再 seed，再启动服务；当前 schema 为 v3，升级到 v3 后旧二进制不能直接运行在该数据库上。
+- 升级 Burrow 前备份数据库并保留原 master key，按 [恢复与升级说明](recovery.md)操作。先迁移，再 seed，再启动服务；当前 schema 为 v4，升级到 v4 后旧二进制不能直接运行在该数据库上。
 - 生产使用 PostgreSQL、HTTPS 和独立的生产凭据。确认 `server.issuer` / `BURROW_ISSUER` 是 Burrow 的实际对外地址。
 - 浏览器和 Grafana 后端都必须能访问 Burrow。容器内的 `localhost` 不是 Burrow 地址。
 - 检查 `<issuer>/.well-known/openid-configuration`，确认 issuer 和各端点没有指向开发地址。
@@ -25,7 +25,6 @@
 | Origins                   | 留空                                              |
 | 允许不使用 PKCE 登录      | 关闭                                              |
 | 本地密码登录              | 开启，用于本地用户验收                            |
-| Providers                 | 首轮可留空                                        |
 
 保存 Client ID 和一次性显示的 Client Secret。密钥丢失时重置并同步更新 Grafana。
 

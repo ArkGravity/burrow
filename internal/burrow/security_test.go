@@ -27,6 +27,13 @@ type browser struct {
 }
 
 func newBrowser(b *Server) *browser { return &browser{b: b, cookies: map[string]*http.Cookie{}} }
+func cookieRequest(c *browser) *http.Request {
+	r := httptest.NewRequest("GET", "/", nil)
+	for _, cookie := range c.cookies {
+		r.AddCookie(cookie)
+	}
+	return r
+}
 func (c *browser) request(method, path string, body any, csrf bool) *httptest.ResponseRecorder {
 	var raw []byte
 	content := "application/json"
@@ -76,7 +83,7 @@ func (c *browser) login(t *testing.T, username, password string) {
 		t.Fatalf("login %d: %s", w.Code, w.Body.String())
 	}
 }
-func testStore(t *testing.T, driver string) *Store {
+func openTestStore(t *testing.T, driver string) *Store {
 	t.Helper()
 	dsn := filepath.Join(t.TempDir(), "test.db")
 	if driver == "postgres" {
@@ -120,8 +127,13 @@ func testStore(t *testing.T, driver string) *Store {
 		t.Cleanup(func() { pool.Close() })
 		t.Cleanup(func() { s.DB.Exec("DROP SCHEMA " + schema + " CASCADE") })
 	}
-	if e = s.Migrate(); e != nil {
-		t.Fatal(e)
+	return s
+}
+func testStore(t *testing.T, driver string) *Store {
+	t.Helper()
+	s := openTestStore(t, driver)
+	if err := s.Migrate(); err != nil {
+		t.Fatal(err)
 	}
 	return s
 }
@@ -211,9 +223,9 @@ func TestAdminSafetyAndRBAC(t *testing.T) {
 	for _, driver := range []string{"sqlite", "postgres"} {
 		t.Run(driver, func(t *testing.T) {
 			b, c, admin := testServer(t, driver)
-			for _, body := range []map[string]any{{"enabled": false}, {"localEnabled": false}, {"roleIds": []string{}}} {
+			for _, body := range []map[string]any{{"enabled": false}, {"roleIds": []string{}}} {
 				w := c.request("PUT", "/api/v1/users/"+admin.ID, body, true)
-				if w.Code != 409 || !strings.Contains(w.Body.String(), "last_local_admin") {
+				if w.Code != 409 || !strings.Contains(w.Body.String(), "last_admin") {
 					t.Fatalf("last admin: %d %s", w.Code, w.Body.String())
 				}
 			}
@@ -221,7 +233,7 @@ func TestAdminSafetyAndRBAC(t *testing.T) {
 			if w.Code != 409 {
 				t.Fatalf("delete last admin %d %s", w.Code, w.Body.String())
 			}
-			u := User{ID: random(18), Username: "ordinary", Name: "ordinary", Enabled: true, LocalEnabled: true}
+			u := User{ID: random(18), Username: "ordinary", Name: "ordinary", Enabled: true}
 			u.PasswordHash, _ = passwordHash(testPassword)
 			if e := b.DB.Create(&u).Error; e != nil {
 				t.Fatal(e)
@@ -242,10 +254,6 @@ func TestAdminSafetyAndRBAC(t *testing.T) {
 					t.Fatalf("non-admin modified admin: %d %s", w.Code, w.Body.String())
 				}
 			}
-			w = other.request("POST", "/api/v1/users/"+admin.ID+"/identities", map[string]string{"providerId": "x", "subject": "attacker"}, true)
-			if w.Code != 403 {
-				t.Fatal("non-admin linked admin identity")
-			}
 			group := Group{ID: random(18), Name: "Readers"}
 			b.DB.Create(&group)
 			reader := Role{ID: random(18), Name: "reader"}
@@ -262,7 +270,7 @@ func TestAdminSafetyAndRBAC(t *testing.T) {
 }
 func testApp(t *testing.T, b *Server, kind string) Application {
 	t.Helper()
-	app := Application{ID: random(18), ClientID: random(18), Name: "Test app", Enabled: true, LocalEnabled: true, ClientType: kind, RedirectURLs: []string{"http://client.example/callback"}, LogoutURLs: []string{"http://client.example/logout"}, Origins: []string{"http://client.example"}, LoginURL: "http://client.example/login"}
+	app := Application{ID: random(18), ClientID: random(18), Name: "Test app", Enabled: true, ClientType: kind, RedirectURLs: []string{"http://client.example/callback"}, LogoutURLs: []string{"http://client.example/logout"}, Origins: []string{"http://client.example"}, LoginURL: "http://client.example/login"}
 	if kind == "web" {
 		app.SecretHash = hash("secret")
 	}
@@ -445,32 +453,6 @@ func TestOIDCRejectsStaleAuthorizationAndPrompt(t *testing.T) {
 	code, _ = authorize(t, c, a, url.Values{"prompt": {"none"}})
 	if code != "error:login_required" {
 		t.Fatal("expired session accepted")
-	}
-}
-func TestProviderAssignmentsAndImmutableIssuer(t *testing.T) {
-	b, c, admin := testServer(t, "sqlite")
-	secret, _ := b.seal("provider-secret")
-	provider := Provider{ID: random(18), Name: "Provider", Issuer: "https://accounts.example", ClientID: "client", SecretCipher: secret, Enabled: true}
-	b.DB.Create(&provider)
-	a := testApp(t, b, "spa")
-	w := c.request("PUT", "/api/v1/applications/"+a.ID, map[string]any{"providerIds": []string{provider.ID}}, true)
-	if w.Code != 200 {
-		t.Fatalf("assign provider %d %s", w.Code, w.Body.String())
-	}
-	var n int64
-	b.DB.Model(&ApplicationProvider{}).Where("application_id = ?", a.ID).Count(&n)
-	if n != 1 {
-		t.Fatal("provider association absent")
-	}
-	identity := ExternalIdentity{ID: random(18), UserID: admin.ID, ProviderID: provider.ID, Issuer: provider.Issuer, Subject: "linked"}
-	b.DB.Create(&identity)
-	identity.ID = random(18)
-	if b.DB.Create(&identity).Error == nil {
-		t.Fatal("duplicate external identity accepted")
-	}
-	w = c.request("PUT", "/api/v1/providers/"+provider.ID, map[string]string{"issuer": "https://other.example"}, true)
-	if w.Code != 409 || !strings.Contains(w.Body.String(), "provider_issuer_immutable") {
-		t.Fatalf("issuer mutated %d %s", w.Code, w.Body.String())
 	}
 }
 func TestPasswordAndEncryption(t *testing.T) {
