@@ -314,7 +314,10 @@ func (b *Server) mutate(w http.ResponseWriter, r *http.Request, resource string)
 				return err
 			}
 			if !u.Enabled || passwordProvided {
-				if err := tx.Model(&Session{}).Where("user_id = ?", id).Update("revoked", true).Error; err != nil {
+				if err := tx.Model(&User{}).Where("id = ?", id).Update("auth_version", gorm.Expr("auth_version + 1")).Error; err != nil {
+					return err
+				}
+				if err := invalidateAuthentication(tx, id, "", ""); err != nil {
 					return err
 				}
 			}
@@ -695,7 +698,7 @@ func (b *Server) deleteResource(tx *gorm.DB, resource, id string, admin, canAuth
 		if contains(ids, "admin") && !admin {
 			return errors.New("forbidden")
 		}
-		for _, m := range []any{&UserRole{}, &GroupMember{}} {
+		for _, m := range []any{&UserRole{}, &GroupMember{}, &LoginTransaction{}} {
 			if e := tx.Where("user_id = ?", id).Delete(m).Error; e != nil {
 				return e
 			}
@@ -756,10 +759,10 @@ func (b *Server) resetPassword(w http.ResponseWriter, r *http.Request) {
 		if e := exists(tx, &User{}, id); e != nil {
 			return e
 		}
-		if e := tx.Model(&User{}).Where("id = ?", id).Updates(map[string]any{"password_hash": h, "must_change_password": true}).Error; e != nil {
+		if e := tx.Model(&User{}).Where("id = ?", id).Updates(map[string]any{"password_hash": h, "must_change_password": true, "auth_version": gorm.Expr("auth_version + 1")}).Error; e != nil {
 			return e
 		}
-		return tx.Model(&Session{}).Where("user_id = ?", id).Update("revoked", true).Error
+		return invalidateAuthentication(tx, id, "", "")
 	})
 	if e != nil {
 		mutationError(w, r, e)
@@ -780,7 +783,7 @@ func (b *Server) revokeSessions(w http.ResponseWriter, r *http.Request) {
 		if e := exists(tx, &User{}, id); e != nil {
 			return e
 		}
-		return tx.Model(&Session{}).Where("user_id = ?", id).Update("revoked", true).Error
+		return invalidateAuthentication(tx, id, "", "")
 	})
 	if err != nil {
 		mutationError(w, r, err)

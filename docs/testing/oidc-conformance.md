@@ -1,9 +1,18 @@
 # 协议与回归验证记录
 
+## 2026-10-02：强制 MFA 实现与回归
+
+- Provider 移除已通过 [PR #1](https://github.com/ArkGravity/burrow/pull/1) squash 合并到 `main`（`617cd9e`）；按用户要求直接合并，未检查 CI。本地 main 更新后创建 `feat/mandatory-mfa`，完成以下 MFA 实现与验证。
+- 2026-10-02，用户确认 MFA 功能已在浏览器上人工验收通过，并授权提交、推送和 PR 合并。此项为用户人工验收反馈，以下自动化检查结果分别记录。
+- 新增迁移 005/schema v5，001–004 未修改；全员首次登录强制 TOTP，密码通过仅建立五分钟受限事务。临时密码、绑定或 MFA 验证全部完成后才签发正式会话；已有绑定的密码重置先验证原 MFA 再改密。新增管理员重置（自身未使用动态码及原因）和 CLI 恢复，同事务撤销目标会话/Token/未完成事务并审计；密码和 MFA 分别重置。
+- 使用独立临时 PostgreSQL 17 与 SQLite 运行完整 `make test-db lint`，race 测试与静态分析通过。最终新增保护和边界修改另运行相应双库 race 用例，覆盖账号级限速不能通过新事务绕过、改密轮换凭据且不延长期限、实际 ID Token 的 `pwd`/`otp` 和 `auth_time`、受限改密资格检查、退出及新鲜认证。TOTP 官方向量、±1 周期、防重放、并发单次消费/绑定、浏览器绑定、权限/认证版本复查、禁用/应用撤权/请求过期、迁移和审计失败回滚、CLI 恢复均有后端覆盖。
+- `make test-e2e` 四条 Chromium 流程通过：管理员/普通用户首次绑定、刷新恢复、中文/主题/权限；Web 从应用发起的密码+MFA 授权继续、Web/SPA 共享 SSO/RP 退出；单 Web 无 PKCE 兼容；受限事务过期、在线重置后重新绑定、密码重置保留 MFA 的验证顺序，以及唯一管理员的实际 CLI 恢复。运行器构建前端和嵌入前端的 Go 二进制，全部使用临时 SQLite 数据。
+- `make web-check` 类型检查与两条单测、静默 Compose 配置校验通过；文档格式、本地链接与 diff 检查通过。测试容器/服务完成后清理；未修改真实项目数据库，未构建 Burrow 容器镜像或部署生产，也未重新验收 Grafana/Nightingale/Harbor 或验证 MFA 远端 CI。
+
 ## 上游 Provider 移除（2026-10-02）
 
 - 在 `feat/remove-upstream-providers` 分支移除上游 OIDC、Provider 管理、外部身份关联和用户/应用认证来源配置；保留下游 Applications、共享 SSO、应用授权和 PKCE 策略。当前 schema 为 v4，历史迁移 001–003 未修改。
-- 迁移 004 在同一事务内清理上游数据与 Provider 权限、撤销非密码来源会话/Token 和未完成授权，并记录审计。启用用户需要密码且用户/应用必须允许本地登录，否则迁移拒绝并回滚。升级须先在旧版本准备这些记录；禁用的无密码账号保留，管理员可重置密码后显式启用。当前 MFA 尚未实现，[方案](../development/mfa-proposal.md) 供用户评估。
+- 迁移 004 在同一事务内清理上游数据与 Provider 权限、撤销非密码来源会话/Token 和未完成授权，并记录审计。启用用户需要密码且用户/应用必须允许本地登录，否则迁移拒绝并回滚。升级须先在旧版本准备这些记录；禁用的无密码账号保留，管理员可重置密码后显式启用。当时 MFA 尚未实现；随后经用户确认，实施情况见上面的本轮 MFA 记录及 [认证与恢复说明](../development/mfa-proposal.md)。
 - 使用临时 PostgreSQL 17 容器的独立数据库和测试隔离 schema，`make test-db lint` 通过完整 SQLite/PostgreSQL race 测试和 Go 静态检查。针对迁移和密码认证的双数据库 race 测试也通过，覆盖旧 schema v1/v2/v3 升级、数据/密钥/授权保留、错误迁移拒绝、审计失败回滚、旧上游 API 与字段拒绝、禁用旧账号恢复、未知认证来源在 API/授权/换码/UserInfo 的拒绝。
 - `make web-check` 通过类型检查和两条单元测试。`make test-e2e` 通过三条 Chromium 流程，包括移除旧 UI 入口、用户临时密码改密、从独立 Web 应用发起的密码登录、Web/SPA 共享 SSO 和 RP 退出，以及独立 Web 客户端的单应用无 PKCE 兼容。浏览器运行器构建并运行嵌入前端的 Go 二进制。
 - `make compose-config COMPOSE_ENV=.env.example` 静默校验通过。格式、当前文档的本地链接和 `git diff --check` 通过。本轮未构建 Burrow 容器镜像、部署生产、重新部署 Grafana/Nightingale/Harbor 或验证远端 CI。此前三应用用户验收和以下旧版本测试记录仍是历史检查点，不代表本轮重新验收。

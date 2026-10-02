@@ -9,6 +9,7 @@ import (
 
 	"github.com/zitadel/oidc/v3/pkg/oidc"
 	"github.com/zitadel/oidc/v3/pkg/op"
+	"gorm.io/gorm"
 )
 
 func (b *Server) initOIDC() error {
@@ -133,12 +134,15 @@ func (b *Server) oidcLogin(w http.ResponseWriter, r *http.Request) {
 	u, session, e := b.session(r)
 	mustLogin := e != nil
 	if !mustLogin {
+		if contains(a.Request.Prompt, "login") && session.AuthTime.Before(a.ExpiresAt.Add(-b.Config.LoginTTL)) {
+			mustLogin = true
+		}
 		if a.Request.MaxAge != nil {
 			max := time.Duration(*a.Request.MaxAge) * time.Second
 			if *a.Request.MaxAge == 0 {
-				mustLogin = session.AuthTime.Unix() < a.ExpiresAt.Add(-b.Config.LoginTTL).Unix()
+				mustLogin = mustLogin || session.AuthTime.Before(a.ExpiresAt.Add(-b.Config.LoginTTL))
 			} else {
-				mustLogin = time.Since(session.AuthTime) > max
+				mustLogin = mustLogin || time.Since(session.AuthTime) > max
 			}
 		}
 		a.UserID = u.ID
@@ -158,10 +162,6 @@ func (b *Server) oidcLogin(w http.ResponseWriter, r *http.Request) {
 			b.authError(w, r, a, "login_required")
 			return
 		}
-		if u.MustChangePassword {
-			http.Redirect(w, r, "/change-password?requestId="+url.QueryEscape(id), 302)
-			return
-		}
 		http.Redirect(w, r, "/login?requestId="+url.QueryEscape(id), 302)
 		return
 	}
@@ -173,7 +173,12 @@ func (b *Server) oidcLogin(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	if e = b.DB.Model(&AuthTransaction{}).Where("id = ?", id).Updates(map[string]any{"user_id": u.ID, "session_id": session.ID, "auth_time": session.AuthTime, "method": session.Method}).Error; e != nil {
+	if e = b.authenticationTx(func(tx *gorm.DB) error {
+		if _, _, err := b.authorized(tx, a.AuthTransaction); err != nil {
+			return err
+		}
+		return tx.Model(&AuthTransaction{}).Where("id = ? AND consumed = ? AND expires_at > ?", id, false, time.Now()).Updates(map[string]any{"user_id": u.ID, "session_id": session.ID, "auth_time": session.AuthTime, "method": session.Method}).Error
+	}); e != nil {
 		fail(w, r, 503, "unavailable")
 		return
 	}

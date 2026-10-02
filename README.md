@@ -3,7 +3,7 @@
 # burrow
 
 A lightweight, single-organization OpenID Connect identity provider: shared SSO
-sessions, password authentication, users, groups, roles, permissions and
+sessions, password and mandatory TOTP authentication, users, groups, roles, permissions and
 application access. The Go backend and React web UI ship as one `burrow` binary.
 
 - Repository: https://github.com/ArkGravity/burrow
@@ -42,7 +42,7 @@ make web-dev      # Vite on http://localhost:5173
 ```
 
 Open http://localhost:5173 with development credentials `admin` /
-`Burrow-development-admin-2026`, then change the password when prompted.
+`Burrow-development-admin-2026`, then change the password and bind your authenticator when prompted.
 Customize `bootstrap.admin_username`, `admin_name`, `admin_email` and
 `admin_password` in your ignored local YAML before seeding a new database.
 `make seed` is noninteractive and never prints a password. Re-running it preserves
@@ -203,12 +203,12 @@ first release. Clients must verify state, nonce, signature, issuer, audience and
 expiry. Register exact SPA origins for browser access.
 
 Burrow authenticates users with its own passwords; upstream Providers and external
-identity linking have been removed. New users require a temporary password and
+identity linking have been removed. All users must complete TOTP MFA. New users require a temporary password and
 must change it before full access. Schema v4 removes the old Provider data and
 settings. Before upgrading, use the previous version to configure passwords and
 enable local login for active users and applications, or disable unused records.
 Migration refuses incompatible active records and rolls back rather than silently
-changing access. See [upgrade and recovery](docs/operations/recovery.md#upgrade-to-password-only-authentication).
+changing access. See [Provider-removal upgrade](docs/operations/recovery.md#upgrade-to-password-only-authentication) and [MFA upgrade and recovery](docs/operations/recovery.md#mandatory-mfa-upgrade-and-recovery).
 See the [adapter notes](docs/development/oidc-adapter.md) and [client examples](examples/README.md).
 
 ## Documentation and CI
@@ -221,3 +221,12 @@ analysis, frontend checks, Chromium flows and Compose configuration validation.
 Local verification scope and limitations are recorded in the
 [verification report](docs/testing/oidc-conformance.md). Engineering interoperability
 tests are not an OpenID Foundation certification.
+
+MFA setup is mandatory at first login and after an Administrator resets MFA.
+Password login alone creates only a five-minute restricted transaction. Temporary
+password changes and authenticator verification must finish before portal, management
+or OIDC access. Administrators reset MFA with their own unused code and an audit reason;
+this preserves the target password and revokes Burrow sessions/tokens. Password reset
+preserves the existing MFA binding. Operators can recover a lost administrator authenticator
+with `burrow mfa-reset --username admin --reason "Lost authenticator"` using the existing
+configuration and master key. Details: [MFA authentication and recovery](docs/development/mfa-proposal.md).

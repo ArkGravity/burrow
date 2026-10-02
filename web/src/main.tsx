@@ -40,7 +40,12 @@ import {
 import { SessionContext, useSession } from "./lib/session";
 import { Preferences, ThemeContext, type Mode } from "./components/Preferences";
 import { BrandMark } from "./components/BrandMark";
-import { ChangePasswordPage, LoginPage, LogoutPage } from "./pages/Auth";
+import {
+  ChangePasswordPage,
+  LoginPage,
+  LogoutPage,
+  MFAPage,
+} from "./pages/Auth";
 import { HomePage, ProfilePage } from "./pages/Home";
 import { Resources } from "./pages/Resources";
 import "./style.css";
@@ -279,15 +284,10 @@ function Root() {
                   <BrowserRouter>
                     <Routes>
                       <Route path="/login" element={<LoginPage />} />
+                      <Route path="/mfa" element={<MFAPage />} />
                       <Route
                         path="/change-password"
-                        element={
-                          session ? (
-                            <ChangePasswordPage />
-                          ) : (
-                            <Navigate to="/login" replace />
-                          )
-                        }
+                        element={<ChangePasswordPage />}
                       />
                       <Route
                         path="/logout"

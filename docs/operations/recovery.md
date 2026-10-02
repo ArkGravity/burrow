@@ -40,10 +40,31 @@
 
 ## 升级失败
 
-当前 schema 为 v4。迁移 `003_custom_roles.sql` 清理空权限 Viewer 的用户/组关联和未使用的旧 Editor/Viewer，保留有成员及实际权限的旧角色为普通角色；权限码保持不变。详见 [角色升级说明](../development/seed.md#upgrade-from-editor-and-viewer)。升级后旧二进制无法运行在 v4 数据库上，回滚需要升级前备份。
+当前 schema 为 v5（迁移 005 强制 MFA）。迁移 `003_custom_roles.sql` 清理空权限 Viewer 的用户/组关联和未使用的旧 Editor/Viewer，保留有成员及实际权限的旧角色为普通角色；权限码保持不变。详见 [角色升级说明](../development/seed.md#upgrade-from-editor-and-viewer)。升级后旧二进制无法运行在 v5 数据库上，回滚需要升级前备份。
 
 数据库迁移具备版本和校验和，修改已经应用的迁移文件会被拒绝。应用启动不会自行修改 schema。迁移失败时先修复原因，再重跑迁移；不要绕过校验或手工提升版本号。
 
 升级前停止旧 app，执行新镜像迁移并检查结果，再启动 app。以后新增迁移必须保持旧代码兼容，或安排明确的停机迁移。仅回退 Docker 镜像不会回退数据库；无法兼容时从升级前备份恢复，并重新评估期间的数据写入。
 
 基础事件记录保留期由 `BURROW_EVENT_RETENTION` 决定。日志不应包含密码、客户端密钥或完整令牌；排查时不要将真实环境文件和认证请求体上传到问题单。
+
+## Mandatory MFA upgrade and recovery
+
+迁移 `005_mandatory_mfa.sql` 从 schema v4 升级至 v5，不修改 001–004。它撤销所有旧 Burrow 会话和 Access Token、删除未完成授权及未兑换授权码，并记录同事务审计。用户账号、密码、启用状态、角色/组授权、应用配置和签名密钥保留；所有账号尚未绑定 MFA，下一次密码登录强制绑定。临时密码先改密再绑定。旧 Provider 迁移 004 本身保留密码会话，但本版本继续运行 005 后这些会话也失效。
+
+1. 备份数据库、原 master key 和配置；安排重新登录，并准备认证器。
+2. 停止旧服务器，使用原 master key 和新二进制运行 `migrate`、`seed`，再启动服务器。若从更早版本升级，先遵守上面的 Provider 移除前置检查。
+3. 管理员使用现有密码登录，必要时改密，再扫码或输入手动密钥，并验证六位动态码。完成后确认管理和下游 OIDC 登录。
+4. 已有用户依次完成绑定。该升级不清除下游应用自有会话，离线 ID Token 按原过期策略处理。旧二进制拒绝 v5 数据库；回滚需恢复升级前数据库及匹配的配置/master key。
+
+用户丢失认证器时，Administrator 核实身份后在用户列表选择「重置 MFA」，输入自己的未使用动态码和非空原因。重置保持用户密码与启用状态，撤销目标用户 Burrow 会话、Token 和未完成事务；用户下次必须用密码重新绑定。密码重置保留 MFA：临时密码登录后先验证原 MFA，再改密。两者均丢失时分别重置；不要仅凭密码提供自助关闭 MFA。
+
+唯一管理员丢失认证器时，具有服务器/数据库权限的运维人员执行：
+
+```bash
+burrow mfa-reset --config configs/config.local.yaml --username admin --reason "Lost administrator authenticator; identity verified"
+```
+
+容器部署可以执行 `docker compose exec app burrow mfa-reset --username admin --reason "Lost administrator authenticator; identity verified"`，服务名和二进制路径遵循根 Compose 与 Dockerfile。运维恢复必须使用原配置和 master key，不修改 bootstrap 密码或手动清空数据库字段。命令提交 `operator:cli` 的 `mfa:reset` 审计；审计失败会回滚，账号不会自动启用，密码不会打印或改变。恢复后的登录仍需密码与新绑定。
+
+绑定密钥仅在受限绑定页面显示。动态码同一时间步仅能成功用一次，包括绑定、登录和管理员重置；刚用过的码需等待下一组。五次错误码、事务过期或取消后需重新验证密码。保持服务器与认证器时间同步；不要将密钥、二维码或认证请求体放入日志、问题单或共享截图。完整流程和 API 见 [MFA 认证与恢复](../development/mfa-proposal.md)。

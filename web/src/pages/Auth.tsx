@@ -1,8 +1,18 @@
 import { useEffect, useState } from "react";
-import { Alert, App, Button, Form, Input, Space } from "antd";
+import {
+  Alert,
+  App,
+  Button,
+  Form,
+  Input,
+  Space,
+  QRCode,
+  Typography,
+  Spin,
+} from "antd";
 import { ArrowRightOutlined } from "@ant-design/icons";
 import { Navigate, useSearchParams } from "react-router-dom";
-import { api, write, APIError, resetCSRF, type Session } from "../lib/api";
+import { api, write, APIError, resetCSRF, type LoginState } from "../lib/api";
 import { useI18n, errorKey } from "../lib/i18n";
 import { useSession } from "../lib/session";
 import { safeRedirect } from "../lib/access";
@@ -46,6 +56,16 @@ export function AuthFrame({ children }: { children: React.ReactNode }) {
     </div>
   );
 }
+export function continueLogin(value: LoginState) {
+  resetCSRF();
+  window.location.assign(
+    value.step === "complete"
+      ? safeRedirect(value.redirect)
+      : value.step === "password"
+        ? "/change-password"
+        : "/mfa",
+  );
+}
 export function LoginPage() {
   const { t } = useI18n();
   const { session } = useSession();
@@ -54,6 +74,13 @@ export function LoginPage() {
   const [context, setContext] = useState<{ applicationName?: string }>({});
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  useEffect(() => {
+    void api<LoginState>("/auth/login/status")
+      .then((value) => {
+        if (value.requestId === requestId) continueLogin(value);
+      })
+      .catch(() => {});
+  }, [requestId]);
   useEffect(() => {
     let live = true;
     (requestId
@@ -83,16 +110,11 @@ export function LoginPage() {
     setBusy(true);
     setError("");
     try {
-      const value = await write<Session>("/auth/login", {
+      const value = await write<LoginState>("/auth/login", {
         ...values,
         requestId,
       });
-      resetCSRF();
-      window.location.assign(
-        value.user.mustChangePassword
-          ? `/change-password${requestId ? "?requestId=" + encodeURIComponent(requestId) : ""}`
-          : safeRedirect(value.redirect),
-      );
+      continueLogin(value);
     } catch (e) {
       setError((e as APIError).code);
     } finally {
@@ -153,12 +175,15 @@ export function PasswordForm({ required = false }: { required?: boolean }) {
   const submit = async (values: Record<string, string>) => {
     setBusy(true);
     try {
-      const result = await write<{ redirect?: string }>("/me/password", {
-        ...values,
-        requestId: query.get("requestId") || "",
-      });
+      const result = await write<LoginState>(
+        required ? "/auth/login/password" : "/me/password",
+        {
+          ...values,
+          requestId: query.get("requestId") || "",
+        },
+      );
       resetCSRF();
-      if (required) window.location.assign(safeRedirect(result?.redirect));
+      if (required) continueLogin(result);
       else {
         message.success(t("success"));
         form.resetFields();
@@ -171,13 +196,15 @@ export function PasswordForm({ required = false }: { required?: boolean }) {
   };
   return (
     <Form form={form} layout="vertical" requiredMark={false} onFinish={submit}>
-      <Form.Item
-        name="currentPassword"
-        label={t("currentPassword")}
-        rules={[{ required: true, message: t("required") }]}
-      >
-        <Input.Password autoComplete="current-password" />
-      </Form.Item>
+      {!required && (
+        <Form.Item
+          name="currentPassword"
+          label={t("currentPassword")}
+          rules={[{ required: true, message: t("required") }]}
+        >
+          <Input.Password autoComplete="current-password" />
+        </Form.Item>
+      )}
       <Form.Item
         name="password"
         label={t("newPassword")}
@@ -212,17 +239,149 @@ export function PasswordForm({ required = false }: { required?: boolean }) {
   );
 }
 export function ChangePasswordPage() {
+  return <MFAPage />;
+}
+export function MFAPage() {
   const { t } = useI18n();
+  const [state, setState] = useState<LoginState>();
+  const [binding, setBinding] = useState<{ secret: string; uri: string }>();
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [expired, setExpired] = useState(false);
+  useEffect(() => {
+    let live = true;
+    void api<LoginState>("/auth/login/status")
+      .then(async (value) => {
+        if (!live) return;
+        setState(value);
+        if (value.step === "bind") {
+          const secret = await write<{ secret: string; uri: string }>(
+            "/auth/login/bind",
+            {},
+          );
+          if (live) setBinding(secret);
+        }
+      })
+      .catch((e) => {
+        if (live) setError(e.code || "REQUEST_FAILED");
+      });
+    return () => {
+      live = false;
+    };
+  }, []);
+  useEffect(() => {
+    if (!state) return;
+    const timer = window.setInterval(() => {
+      if (Date.now() >= Date.parse(state.expiresAt)) {
+        setExpired(true);
+        setBinding(undefined);
+        setError("INVALID_TRANSACTION");
+      }
+    }, 1000);
+    return () => window.clearInterval(timer);
+  }, [state]);
+  const submit = async (values: { code: string }) => {
+    setBusy(true);
+    setError("");
+    try {
+      continueLogin(await write<LoginState>("/auth/login/verify", values));
+    } catch (e) {
+      setError((e as APIError).code);
+    } finally {
+      setBusy(false);
+    }
+  };
+  const restart = async () => {
+    try {
+      await write("/auth/login/cancel", {});
+      window.location.assign(
+        "/login" +
+          (state?.requestId
+            ? "?requestId=" + encodeURIComponent(state.requestId)
+            : ""),
+      );
+    } catch (e) {
+      setError((e as APIError).code);
+    }
+  };
   return (
     <AuthFrame>
-      <h2>{t("changePassword")}</h2>
-      <Alert
-        type="info"
-        showIcon
-        title={t("mustChange")}
-        className="form-alert"
-      />
-      <PasswordForm required />
+      <h2>
+        {t(
+          state?.step === "password"
+            ? "changePassword"
+            : state?.step === "bind"
+              ? "mfaBind"
+              : "mfaVerify",
+        )}
+      </h2>
+      {error && (
+        <Alert
+          type="error"
+          showIcon
+          title={t(errorKey(error))}
+          className="form-alert"
+        />
+      )}
+      {!state && !error && <Spin />}
+      {state &&
+        !expired &&
+        (state.step === "password" ? (
+          <>
+            <Alert
+              type="info"
+              showIcon
+              title={t("mustChange")}
+              className="form-alert"
+            />
+            <PasswordForm required />
+          </>
+        ) : (
+          <>
+            <p className="muted">
+              {t(state.step === "bind" ? "mfaBindHint" : "mfaVerifyHint")}
+            </p>
+            {state.step === "bind" && binding && (
+              <Space orientation="vertical" className="form-alert">
+                <QRCode value={binding.uri} bgColor="#fff" color="#000" />
+                <Typography.Text>{t("mfaSecret")}</Typography.Text>
+                <Typography.Text code copyable data-testid="mfa-secret">
+                  {binding.secret}
+                </Typography.Text>
+              </Space>
+            )}
+            <Form layout="vertical" onFinish={submit} requiredMark={false}>
+              <Form.Item
+                name="code"
+                label={t("mfaCode")}
+                rules={[
+                  { required: true, message: t("required") },
+                  { pattern: /^[0-9]{6}$/, message: t("mfaCodeHint") },
+                ]}
+              >
+                <Input
+                  autoComplete="one-time-code"
+                  inputMode="numeric"
+                  maxLength={6}
+                  size="large"
+                />
+              </Form.Item>
+              <Button
+                block
+                type="primary"
+                htmlType="submit"
+                loading={busy}
+                disabled={state.step === "bind" && !binding}
+              >
+                {t("mfaContinue")}
+              </Button>
+            </Form>
+          </>
+        ))}
+      <p className="muted">{t("mfaRecoveryHint")}</p>
+      <Button type="link" onClick={() => void restart()}>
+        {t("mfaRestart")}
+      </Button>
     </AuthFrame>
   );
 }

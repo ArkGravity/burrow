@@ -194,6 +194,13 @@ export function ProfilePage() {
           </div>
         </Card>
         <Card title={t("security")}>
+          <Alert
+            type="success"
+            showIcon
+            title={t("mfaBound")}
+            className="form-alert"
+          />
+          <p className="muted">{t("mfaRecoveryHint")}</p>
           <PasswordForm />
         </Card>
       </div>

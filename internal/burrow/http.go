@@ -20,7 +20,6 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/zitadel/oidc/v3/pkg/op"
 	"gorm.io/gorm"
-	"gorm.io/gorm/clause"
 )
 
 type contextKey string
@@ -34,6 +33,7 @@ type Server struct {
 	limits    sync.Mutex
 	attempts  map[string]attempt
 	dummyHash string
+	mfaTime   func() time.Time
 	assets    fs.FS
 }
 type attempt struct {
@@ -46,7 +46,7 @@ func NewServer(s *Store, assets ...fs.FS) (*Server, error) {
 		return nil, err
 	}
 	h, _ := passwordHash(random(32))
-	b := &Server{Store: s, attempts: map[string]attempt{}, dummyHash: h}
+	b := &Server{Store: s, attempts: map[string]attempt{}, dummyHash: h, mfaTime: time.Now}
 	if _, err := (oidcStore{b}).SigningKey(context.Background()); err != nil {
 		return nil, fmt.Errorf("signing key unavailable; run migrate and verify master key: %w", err)
 	}
@@ -71,6 +71,12 @@ func NewServer(s *Store, assets ...fs.FS) (*Server, error) {
 	})
 	r.Get("/api/v1/auth/csrf", b.csrf)
 	r.Post("/api/v1/auth/login", b.login)
+	r.Get("/api/v1/auth/login/status", b.loginStatus)
+	r.Post("/api/v1/auth/login/bind", b.loginBind)
+	r.Post("/api/v1/auth/login/verify", b.loginVerify)
+	r.Post("/api/v1/auth/login/password", b.loginPassword)
+	r.Post("/api/v1/auth/login/cancel", b.loginCancel)
+	r.Post("/api/v1/users/{id}/mfa-reset", b.resetMFA)
 	r.Post("/api/v1/auth/logout", b.logout)
 	r.Get("/api/v1/auth/context", b.authContext)
 	r.Get("/api/v1/me", b.me)
@@ -240,7 +246,9 @@ func (b *Server) me(w http.ResponseWriter, r *http.Request) {
 	}
 }
 func (b *Server) limited(r *http.Request, bucket string) bool {
-	ip := b.clientIP(r)
+	return b.limitedKey(bucket+b.clientIP(r), 30)
+}
+func (b *Server) limitedKey(key string, maximum int) bool {
 	b.limits.Lock()
 	defer b.limits.Unlock()
 	now := time.Now()
@@ -249,86 +257,13 @@ func (b *Server) limited(r *http.Request, bucket string) bool {
 			delete(b.attempts, k)
 		}
 	}
-	key := bucket + ip
 	a := b.attempts[key]
 	if a.Until.Before(now) {
 		a = attempt{Until: now.Add(time.Minute)}
 	}
 	a.Count++
 	b.attempts[key] = a
-	return a.Count > 30
-}
-func (b *Server) newSession(w http.ResponseWriter, r *http.Request, u User) error {
-	credential := random(32)
-	s := Session{ID: random(18), UserID: u.ID, CredentialHash: hash(credential), Method: "password", AuthTime: time.Now(), ExpiresAt: time.Now().Add(b.Config.SessionTTL)}
-	err := b.DB.Transaction(func(tx *gorm.DB) error {
-		var current User
-		if e := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("id = ? AND enabled = ?", u.ID, true).First(&current).Error; e != nil {
-			return e
-		}
-		if current.PasswordHash == "" || current.PasswordHash != u.PasswordHash {
-			return fmt.Errorf("authentication changed")
-		}
-		if c, e := r.Cookie("burrow_session"); e == nil {
-			if e := tx.Model(&Session{}).Where("credential_hash = ?", hash(c.Value)).Update("revoked", true).Error; e != nil {
-				return e
-			}
-		}
-		return tx.Create(&s).Error
-	})
-	if err != nil {
-		return err
-	}
-	b.cookie(w, "burrow_session", credential, int(b.Config.SessionTTL.Seconds()))
-	return nil
-}
-func (b *Server) login(w http.ResponseWriter, r *http.Request) {
-	if b.limited(r, "login") {
-		fail(w, r, 429, "rate_limited")
-		return
-	}
-	var in struct{ Username, Password, RequestID string }
-	if !decode(w, r, &in) {
-		return
-	}
-	var u User
-	e := b.DB.Where("username = ?", in.Username).First(&u).Error
-	encoded := u.PasswordHash
-	if e != nil || encoded == "" {
-		encoded = b.dummyHash
-	}
-	valid := passwordOK(encoded, in.Password)
-	if e != nil || !valid || !u.Enabled {
-		b.event("", "", "login", requestID(r), false)
-		fail(w, r, 401, "invalid_credentials")
-		return
-	}
-	if in.RequestID != "" {
-		a, e := b.browserAuth(r, in.RequestID)
-		if e != nil {
-			fail(w, r, 400, "invalid_transaction")
-			return
-		}
-		var app Application
-		if b.DB.First(&app, "id = ?", a.ClientID).Error != nil || !app.Enabled {
-			fail(w, r, 403, "invalid_application")
-			return
-		}
-	}
-	if e = b.newSession(w, r, u); e != nil {
-		fail(w, r, 503, "unavailable")
-		return
-	}
-	b.event(u.ID, u.ID, "login", requestID(r), true)
-	out, err := b.meResult(u)
-	if err != nil {
-		fail(w, r, 503, "unavailable")
-		return
-	}
-	if in.RequestID != "" {
-		out["redirect"] = "/oidc/login?requestId=" + url.QueryEscape(in.RequestID)
-	}
-	write(w, 200, out)
+	return a.Count > maximum
 }
 func requestID(r *http.Request) string { v, _ := r.Context().Value(requestKey).(string); return v }
 func (b *Server) logout(w http.ResponseWriter, r *http.Request) {
@@ -338,6 +273,11 @@ func (b *Server) logout(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
+	if err := b.cancelLogin(r); err != nil {
+		fail(w, r, 503, "unavailable")
+		return
+	}
+	b.cookie(w, "burrow_login", "", -1)
 	b.cookie(w, "burrow_session", "", -1)
 	write(w, 200, map[string]bool{"ok": true})
 }
@@ -412,10 +352,13 @@ func (b *Server) changePassword(w http.ResponseWriter, r *http.Request) {
 		if current.PasswordHash != u.PasswordHash {
 			return errors.New("invalid_credentials")
 		}
-		if err := tx.Model(&User{}).Where("id = ? AND password_hash = ?", current.ID, u.PasswordHash).Updates(map[string]any{"password_hash": h, "must_change_password": false}).Error; err != nil {
+		if err := tx.Model(&User{}).Where("id = ? AND password_hash = ?", current.ID, u.PasswordHash).Updates(map[string]any{"password_hash": h, "must_change_password": false, "auth_version": gorm.Expr("auth_version + 1")}).Error; err != nil {
 			return err
 		}
-		return tx.Model(&Session{}).Where("user_id = ? AND id <> ?", current.ID, session.ID).Update("revoked", true).Error
+		if err := invalidateAuthentication(tx, current.ID, "", ""); err != nil {
+			return err
+		}
+		return tx.Model(&Session{}).Where("id = ?", session.ID).Updates(map[string]any{"auth_version": current.AuthVersion + 1, "revoked": false}).Error
 	})
 	if e != nil {
 		mutationError(w, r, e)

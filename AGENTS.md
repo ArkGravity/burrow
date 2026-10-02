@@ -30,22 +30,23 @@ The Go module is currently `github.com/logic3579/burrow`, although the repositor
 is hosted at `ArkGravity/burrow`. Preserve existing imports unless a module
 migration is explicitly part of the task.
 
-| Location                                          | Responsibility                                                        |
-| ------------------------------------------------- | --------------------------------------------------------------------- |
-| `cmd/burrow/main.go`                              | `serve`, `migrate`, `seed`, `keys-rotate` and `healthcheck` commands  |
-| `configs/config.yaml`, `configs/embed.go`         | Tracked development defaults and embedded configuration               |
-| `internal/burrow/config.go`                       | YAML loading, environment overrides and validation                    |
-| `internal/burrow/core.go`, `models.go`            | Database lifecycle, identity models, password handling and RBAC       |
-| `internal/burrow/seed.go`                         | Idempotent default-role and administrator initialization              |
-| `internal/burrow/admin.go`, `mutation.go`         | Management APIs, transactional authorization and auditing             |
-| `internal/burrow/http.go`                         | Authentication, sessions, personal resources, portal and HTTP routing |
-| `internal/burrow/oidc_storage.go`, `oidc_http.go` | Downstream OIDC storage and protocol handlers                         |
-| `internal/burrow/network.go`, `cors.go`           | Proxy trust and browser origins                                       |
-| `internal/burrow/migrations/`                     | Explicit, checksummed SQL migrations                                  |
-| `web/src/main.tsx`, `pages/`                      | UI layout, authentication, home and resource management               |
-| `web/src/lib/`, `components/`                     | API/session/access helpers, translations and shared components        |
-| `web/e2e/`, `examples/`                           | Browser regression tests and independent Web/SPA OIDC clients         |
-| `docs/`, `.github/workflows/ci.yml`               | References, operational instructions and CI                           |
+| Location                                          | Responsibility                                                                    |
+| ------------------------------------------------- | --------------------------------------------------------------------------------- |
+| `cmd/burrow/main.go`                              | `serve`, `migrate`, `seed`, `keys-rotate`, `mfa-reset` and `healthcheck` commands |
+| `configs/config.yaml`, `configs/embed.go`         | Tracked development defaults and embedded configuration                           |
+| `internal/burrow/config.go`                       | YAML loading, environment overrides and validation                                |
+| `internal/burrow/core.go`, `models.go`            | Database lifecycle, identity models, password handling and RBAC                   |
+| `internal/burrow/seed.go`                         | Idempotent default-role and administrator initialization                          |
+| `internal/burrow/admin.go`, `mutation.go`         | Management APIs, transactional authorization and auditing                         |
+| `internal/burrow/mfa.go`                          | TOTP, restricted login transactions, MFA reset and operator recovery              |
+| `internal/burrow/http.go`                         | Authentication, sessions, personal resources, portal and HTTP routing             |
+| `internal/burrow/oidc_storage.go`, `oidc_http.go` | Downstream OIDC storage and protocol handlers                                     |
+| `internal/burrow/network.go`, `cors.go`           | Proxy trust and browser origins                                                   |
+| `internal/burrow/migrations/`                     | Explicit, checksummed SQL migrations                                              |
+| `web/src/main.tsx`, `pages/`                      | UI layout, authentication, home and resource management                           |
+| `web/src/lib/`, `components/`                     | API/session/access helpers, translations and shared components                    |
+| `web/e2e/`, `examples/`                           | Browser regression tests and independent Web/SPA OIDC clients                     |
+| `docs/`, `.github/workflows/ci.yml`               | References, operational instructions and CI                                       |
 
 Keep backend changes in the existing package, split by responsibility. Do not
 introduce package layers merely to reorganize files. Production builds embed the
@@ -54,7 +55,18 @@ frontend with `-tags embedweb`; build `web/dist` first, normally through
 
 ## Authentication and authorization
 
-- Authenticate against the current enabled user and valid shared session.
+- Authenticate against the current enabled user and valid shared session with
+  completed MFA and the user's current authentication version. All users require TOTP.
+  Password-only authentication creates a five-minute restricted transaction; complete
+  forced password changes and binding/verification before issuing a shared session.
+- Only Administrator may reset MFA through the API, using their own unused code and
+  an audit reason. Reset clears MFA, increments the authentication version, revokes
+  sessions/tokens and deletes pending transactions atomically with the audit. Password
+  reset preserves MFA. Operator `mfa-reset` requires server/database access and still
+  forces password login and new binding; do not introduce anonymous recovery or bypasses.
+- Encrypt active and pending TOTP secrets with the existing master key. Persist and
+  atomically consume the last accepted time step; prevent replay across binding, login
+  and reset. Never expose secrets in lists, logs or audit records.
   Enforce management permissions on the server; UI visibility is supplementary.
 - Recheck user, application and session access during both OIDC
   authorization and authorization-code exchange.
@@ -148,6 +160,9 @@ the full Groups API. Avoid per-user membership queries.
   login before upgrading; otherwise migration refuses and rolls back. Prepare
   them in the previous version or disable unused records. Preserve disabled
   users without passwords; reset their password before explicitly enabling them.
+- Migration 005 adds mandatory MFA and schema v5, invalidates previous shared sessions,
+  tokens and unfinished authorizations, and preserves identities, passwords, grants,
+  applications and signing keys. Never edit migration 001–004 or auto-bind existing users.
 - Startup order is migration, seed, then server. Keep readiness and signing-key
   validation meaningful. Compose shutdown must preserve database volumes.
 
@@ -241,6 +256,10 @@ when using local overrides. Inspect `make help` for available actions.
   back. Keep historical test results distinct from checks run in the current task.
 
 ## Verification and delivery
+
+- On 2026-10-02, the user reported successful manual browser acceptance of the
+  mandatory MFA feature. Preserve this user-reported checkpoint separately from
+  automated regression results, remote CI and production validation.
 
 | Command                                        | Coverage                                                |
 | ---------------------------------------------- | ------------------------------------------------------- |

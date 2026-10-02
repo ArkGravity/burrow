@@ -24,13 +24,12 @@
 | Post Logout Redirect URIs | 首轮留空                                          |
 | Origins                   | 留空                                              |
 | 允许不使用 PKCE 登录      | 关闭                                              |
-| 本地密码登录              | 开启，用于本地用户验收                            |
 
 保存 Client ID 和一次性显示的 Client Secret。密钥丢失时重置并同步更新 Grafana。
 
 创建时可选填写固定 Client ID 和 Web Client Secret，留空自动生成。Client ID 最多 128 个字母、数字或 `-._~`；Secret 为 16–256 个不含空格的可打印 ASCII 字符。创建后 Client ID 不可修改，编辑表单不修改 Secret；轮换使用“重置密钥”。本地示例见 [独立 Docker Compose](../../examples/local-sso/README.md)，生产应使用独立的随机密钥。
 
-创建有姓名和有效邮箱的普通测试用户，启用账户和本地登录，先完成临时密码修改。创建普通角色 `Grafana Users`，授予对应 `app:<应用 ID>:login` 权限，再直接或通过组分配给测试用户。新用户默认无角色，需要通过普通角色授予应用登录权限；不要只用管理员验证授权。
+创建有姓名和有效邮箱的普通测试用户，启用账户，先完成临时密码修改和 TOTP 绑定。创建普通角色 `Grafana Users`，授予对应 `app:<应用 ID>:login` 权限，再直接或通过组分配给测试用户。新用户默认无角色，需要通过普通角色授予应用登录权限；不要只用管理员验证授权。
 
 ## Grafana 配置
 
@@ -82,7 +81,7 @@ Docker 可以使用 `GF_<配置段>_<配置项>` 环境变量覆盖，例如 `GF
 ## 验收步骤
 
 1. 隐私窗口打开 Grafana 登录页，确认出现 Burrow 登录按钮。
-2. 点击按钮，用有应用权限的普通 Burrow 用户登录，返回 Grafana。
+2. 点击按钮，用有应用权限的普通 Burrow 用户完成密码与 MFA 验证，返回 Grafana。
 3. 核对用户名、姓名、邮箱和首次分配的 Viewer 角色。
 4. 只退出 Grafana，保留 Burrow 会话，再次 OIDC 登录，应复用 SSO 会话。
 5. 从 Burrow 应用门户点击 Grafana，确认能完成登录。

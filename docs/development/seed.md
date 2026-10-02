@@ -3,7 +3,7 @@
 Run `make migrate` and then `make seed`. The seed command is explicit,
 noninteractive and obtains credentials from YAML or environment overrides.
 It never prints a password, and the database stores an Argon2id hash. A newly
-created administrator must change the temporary password on first login.
+created administrator must change the temporary password and bind TOTP on first login.
 
 Seed uses a database transaction and the same serialization lock as authorization
 changes. Repeating it supplements missing built-in roles/permission bindings,
@@ -63,7 +63,7 @@ Schema v4 subsequently removes upstream authentication; see
 
 ## New-user defaults and group display
 
-Creating a user requires a temporary password and forces a password change.
+Creating a user requires a temporary password, forces a password change and then TOTP enrollment before a formal session.
 The creation form does not preselect a role. Omitted `roleIds` and an explicit empty
 array both create a user with no roles; updates never add default roles. A valid
 session grants access to personal resources and the authorized application portal,
