@@ -169,7 +169,7 @@ func TestPKCECompatibilityAdministration(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			u := User{ID: random(18), Username: "editor", PasswordHash: h, Enabled: true, LocalEnabled: true}
+			u := User{ID: random(18), Username: "editor", PasswordHash: h, Enabled: true}
 			if err := b.DB.Create(&u).Error; err != nil {
 				t.Fatal(err)
 			}
@@ -247,17 +247,9 @@ func TestPKCECompatibilityAdministration(t *testing.T) {
 func TestPKCEMigrationUpgrade(t *testing.T) {
 	for _, driver := range []string{"sqlite", "postgres"} {
 		t.Run(driver, func(t *testing.T) {
-			s := testStore(t, driver)
+			s := testLegacyStore(t, driver, 1)
 			app := Application{ID: random(18), ClientID: random(18), ClientType: "web", Enabled: true, Name: "existing app", SecretHash: "existing hash", AllowWithoutPKCE: true}
-			if err := s.DB.Create(&app).Error; err != nil {
-				t.Fatal(err)
-			}
-			// Reconstruct the version-one schema to exercise an upgrade with data.
-			for _, sql := range []string{"ALTER TABLE applications DROP COLUMN allow_without_pkce", "ALTER TABLE events DROP COLUMN details"} {
-				if err := s.DB.Exec(sql).Error; err != nil {
-					t.Fatal(err)
-				}
-			}
+			createLegacyApplication(t, s, app, true)
 			if err := s.DB.Model(&SchemaVersion{}).Where("id = 1").Updates(map[string]any{"version": 1, "checksum": hash(initialMigration)}).Error; err != nil {
 				t.Fatal(err)
 			}

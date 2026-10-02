@@ -8,7 +8,6 @@ type User struct {
 	Name               string     `json:"name"`
 	Email              string     `json:"email"`
 	Enabled            bool       `json:"enabled"`
-	LocalEnabled       bool       `json:"localEnabled"`
 	PasswordHash       string     `json:"-"`
 	MustChangePassword bool       `json:"mustChangePassword"`
 	Language           string     `json:"language"`
@@ -63,10 +62,6 @@ type RolePermission struct {
 	RoleID       string `gorm:"primaryKey"`
 	PermissionID string `gorm:"primaryKey"`
 }
-type ApplicationProvider struct {
-	ApplicationID string `gorm:"primaryKey"`
-	ProviderID    string `gorm:"primaryKey"`
-}
 type Application struct {
 	ID               string   `gorm:"primaryKey" json:"id"`
 	Name             string   `json:"name"`
@@ -79,32 +74,14 @@ type Application struct {
 	RedirectURLs     []string `gorm:"serializer:json" json:"redirectUris"`
 	LogoutURLs       []string `gorm:"serializer:json" json:"postLogoutRedirectUris"`
 	Origins          []string `gorm:"serializer:json" json:"origins"`
-	LocalEnabled     bool     `json:"localEnabled"`
 	AllowWithoutPKCE bool     `json:"allowWithoutPkce"`
-	ProviderIDs      []string `gorm:"-" json:"providerIds"`
 	RoleIDs          []string `gorm:"-" json:"roleIds"`
-}
-type Provider struct {
-	ID           string `gorm:"primaryKey" json:"id"`
-	Name         string `json:"name"`
-	Issuer       string `json:"issuer"`
-	ClientID     string `json:"clientId"`
-	SecretCipher string `json:"-"`
-	Enabled      bool   `json:"enabled"`
-}
-type ExternalIdentity struct {
-	ID         string `gorm:"primaryKey" json:"id"`
-	ProviderID string `gorm:"uniqueIndex:external_subject" json:"providerId"`
-	Issuer     string `gorm:"uniqueIndex:external_subject" json:"issuer"`
-	Subject    string `gorm:"uniqueIndex:external_subject" json:"subject"`
-	UserID     string `gorm:"index" json:"userId"`
 }
 type Session struct {
 	ID             string `gorm:"primaryKey"`
 	UserID         string `gorm:"index"`
 	CredentialHash string `gorm:"uniqueIndex"`
 	Method         string
-	ProviderID     string
 	AuthTime       time.Time
 	ExpiresAt      time.Time `gorm:"index"`
 	Revoked        bool
@@ -122,16 +99,6 @@ type AuthTransaction struct {
 	Consumed      bool
 	AuthTime      time.Time
 	Method        string
-}
-type UpstreamTransaction struct {
-	ID          string `gorm:"primaryKey"`
-	ProviderID  string
-	RequestID   string
-	BrowserHash string
-	Nonce       string
-	Verifier    string
-	ExpiresAt   time.Time `gorm:"index"`
-	Consumed    bool
 }
 type TokenRecord struct {
 	ID        string `gorm:"primaryKey"`

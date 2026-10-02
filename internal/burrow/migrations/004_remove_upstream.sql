@@ -1,0 +1,13 @@
+UPDATE sessions SET revoked = TRUE WHERE method IS NULL OR method <> 'password';
+UPDATE token_records SET revoked = TRUE WHERE session_id IN (SELECT id FROM sessions WHERE method IS NULL OR method <> 'password');
+DELETE FROM auth_transactions WHERE (method IS NOT NULL AND method <> 'password') OR session_id IN (SELECT id FROM sessions WHERE method IS NULL OR method <> 'password');
+DELETE FROM role_permissions WHERE permission_id IN ('providers:read', 'providers:write');
+DELETE FROM permissions WHERE id IN ('providers:read', 'providers:write');
+DROP TABLE upstream_transactions;
+DROP TABLE external_identities;
+DROP TABLE application_providers;
+DROP TABLE providers;
+ALTER TABLE sessions DROP COLUMN provider_id;
+ALTER TABLE users DROP COLUMN local_enabled;
+ALTER TABLE applications DROP COLUMN local_enabled;
+INSERT INTO events (id, actor_id, object_id, kind, success, request_id, created_at, details) VALUES ('migration:004:remove_upstream', '', '', 'authentication:migrate', TRUE, '', CURRENT_TIMESTAMP, '{"migration":4,"policy":"remove upstream OIDC and Provider grants, revoke non-password authentication, preserve users, applications, passwords and remaining authorization"}') ON CONFLICT (id) DO NOTHING;

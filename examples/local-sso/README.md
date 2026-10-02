@@ -42,15 +42,15 @@ python3 examples/local-sso/harbor/deploy.py ps
 
 在 Burrow 浏览器管理界面的“应用”中创建：
 
-| 字段                                          | 值                                             |
-| --------------------------------------------- | ---------------------------------------------- |
-| 名称                                          | Grafana                                        |
-| 客户端类型                                    | Web                                            |
-| 启用、本地密码登录                            | 开启                                           |
-| 应用登录 URL                                  | `http://grafana.yakir.top/login/generic_oauth` |
-| Redirect URIs                                 | `http://grafana.yakir.top/login/generic_oauth` |
-| 允许不使用 PKCE                               | 关闭                                           |
-| Post Logout Redirect URIs、Origins、Providers | 留空                                           |
+| 字段                               | 值                                             |
+| ---------------------------------- | ---------------------------------------------- |
+| 名称                               | Grafana                                        |
+| 客户端类型                         | Web                                            |
+| 启用、本地密码登录                 | 开启                                           |
+| 应用登录 URL                       | `http://grafana.yakir.top/login/generic_oauth` |
+| Redirect URIs                      | `http://grafana.yakir.top/login/generic_oauth` |
+| 允许不使用 PKCE                    | 关闭                                           |
+| Post Logout Redirect URIs、Origins | 留空                                           |
 
 [grafana.ini](grafana.ini) 预配置 Client ID `grafana-example` 和 Client Secret `grafana-example-secret`。
 
@@ -114,17 +114,17 @@ Email = "email"
 
 ### 在 Burrow 中创建 Nightingale 应用
 
-| 字段                                          | 值                              |
-| --------------------------------------------- | ------------------------------- |
-| 名称                                          | Nightingale                     |
-| 客户端类型                                    | Server-side Web                 |
-| Client ID                                     | `nightingale-example`           |
-| Client Secret                                 | `nightingale-example-secret`    |
-| 启用、本地密码登录                            | 开启                            |
-| 应用登录 URL                                  | `http://n9e.yakir.top/`         |
-| Redirect URIs                                 | `http://n9e.yakir.top/callback` |
-| 允许不使用 PKCE                               | **开启**                        |
-| Post Logout Redirect URIs、Origins、Providers | 留空                            |
+| 字段                               | 值                              |
+| ---------------------------------- | ------------------------------- |
+| 名称                               | Nightingale                     |
+| 客户端类型                         | Server-side Web                 |
+| Client ID                          | `nightingale-example`           |
+| Client Secret                      | `nightingale-example-secret`    |
+| 启用、本地密码登录                 | 开启                            |
+| 应用登录 URL                       | `http://n9e.yakir.top/`         |
+| Redirect URIs                      | `http://n9e.yakir.top/callback` |
+| 允许不使用 PKCE                    | **开启**                        |
+| Post Logout Redirect URIs、Origins | 留空                            |
 
 夜莺 v9.1.1 的授权码登录没有发送 PKCE，因此仅为这个 Web 应用开启兼容选项，Grafana 保持关闭。配置显式请求 `openid profile email`，没有 `phone` 或 `offline_access`；用户名/姓名/邮箱分别映射 `preferred_username` / `name` / `email`。
 
@@ -186,17 +186,17 @@ Email = "email"
 
 ### 在 Burrow 中创建 Harbor 应用
 
-| 字段                                          | 值                                                      |
-| --------------------------------------------- | ------------------------------------------------------- |
-| 名称                                          | Harbor                                                  |
-| 客户端类型                                    | Server-side Web                                         |
-| Client ID                                     | `harbor-example`                                        |
-| Client Secret                                 | `harbor-example-secret`                                 |
-| 启用、本地密码登录                            | 开启                                                    |
-| 应用登录 URL                                  | `http://harbor.yakir.top/c/oidc/login?redirect_url=%2F` |
-| Redirect URIs                                 | `http://harbor.yakir.top/c/oidc/callback`               |
-| 允许不使用 PKCE                               | **关闭**                                                |
-| Post Logout Redirect URIs、Origins、Providers | 留空                                                    |
+| 字段                               | 值                                                      |
+| ---------------------------------- | ------------------------------------------------------- |
+| 名称                               | Harbor                                                  |
+| 客户端类型                         | Server-side Web                                         |
+| Client ID                          | `harbor-example`                                        |
+| Client Secret                      | `harbor-example-secret`                                 |
+| 启用、本地密码登录                 | 开启                                                    |
+| 应用登录 URL                       | `http://harbor.yakir.top/c/oidc/login?redirect_url=%2F` |
+| Redirect URIs                      | `http://harbor.yakir.top/c/oidc/callback`               |
+| 允许不使用 PKCE                    | **关闭**                                                |
+| Post Logout Redirect URIs、Origins | 留空                                                    |
 
 Harbor 原生发送 PKCE S256，无须兼容豁免。应用登录 URL 使用 Harbor 的 OIDC 发起路由，`redirect_url=%2F` 表示成功后返回 Harbor 首页；此入口已验证会跳转到 Burrow。Harbor 的 `external_url` 保证回调使用以上公开地址。
 

@@ -169,7 +169,7 @@ func (b *Server) authorized(tx *gorm.DB, a AuthTransaction) (User, Session, erro
 	var u User
 	var session Session
 	var app Application
-	if e := tx.Where("id = ? AND enabled = ? AND must_change_password = ?", a.UserID, true, false).First(&u).Error; e != nil {
+	if e := tx.Where("id = ? AND enabled = ? AND must_change_password = ? AND password_hash <> ?", a.UserID, true, false, "").First(&u).Error; e != nil {
 		return u, session, e
 	}
 	if e := tx.Where("id = ? AND revoked = ? AND expires_at > ? AND user_id = ?", a.SessionID, false, time.Now(), u.ID).First(&session).Error; e != nil {
@@ -195,19 +195,8 @@ func (b *Server) authorized(tx *gorm.DB, a AuthTransaction) (User, Session, erro
 	if !admin && !contains(p, "app:"+app.ID+":login") {
 		return u, session, oidc.ErrAccessDenied()
 	}
-	if session.Method == "password" {
-		if !u.LocalEnabled || !app.LocalEnabled {
-			return u, session, oidc.ErrLoginRequired()
-		}
-	} else {
-		var provider Provider
-		if e := tx.Where("id = ? AND enabled = ?", session.ProviderID, true).First(&provider).Error; e != nil {
-			return u, session, oidc.ErrLoginRequired()
-		}
-		var n int64
-		if e := tx.Model(&ApplicationProvider{}).Where("application_id = ? AND provider_id = ?", app.ID, provider.ID).Count(&n).Error; e != nil || n != 1 {
-			return u, session, oidc.ErrLoginRequired()
-		}
+	if session.Method != "password" {
+		return u, session, oidc.ErrLoginRequired()
 	}
 	return u, session, nil
 }

@@ -30,7 +30,7 @@ SQLite 通过 CGO 驱动访问，构建需要 C 编译器。容器最终镜像�
 | `http.go`                             | 会话、本地登录、偏好、主页、CSRF、静态资源       |
 | `admin.go`、`mutation.go`             | 管理 API、RBAC、管理员保护、事务内权限复查与审计 |
 | `oidc_storage.go`、`oidc_http.go`     | 下游 OP 库适配、授权、Token、JWKS 与退出         |
-| `upstream.go`、`network.go`           | 上游 RP、外部身份绑定、网络限制与可信代理        |
+| `network.go`                          | 可信代理与客户端地址解析                         |
 | `cors.go`                             | 精确 SPA 来源校验                                |
 | `web/src/`                            | React 页面、API、双语、主题与权限导航            |
 | `web/e2e/`、`examples/`               | 浏览器测试及独立协议客户端                       |

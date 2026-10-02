@@ -27,7 +27,6 @@ import {
   UserOutlined,
   SafetyOutlined,
   KeyOutlined,
-  ApiOutlined,
   LogoutOutlined,
 } from "@ant-design/icons";
 import { api, write, type Session } from "./lib/api";
@@ -61,12 +60,6 @@ const navigation = [
     key: "applications",
     path: "/applications",
     icon: <AppstoreOutlined />,
-    group: "connections",
-  },
-  {
-    key: "providers",
-    path: "/providers",
-    icon: <ApiOutlined />,
     group: "connections",
   },
 ] as const;

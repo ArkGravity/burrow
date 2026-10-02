@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Alert, App, Button, Divider, Form, Input, Space } from "antd";
+import { Alert, App, Button, Form, Input, Space } from "antd";
 import { ArrowRightOutlined } from "@ant-design/icons";
 import { Navigate, useSearchParams } from "react-router-dom";
 import { api, write, APIError, resetCSRF, type Session } from "../lib/api";
@@ -51,11 +51,7 @@ export function LoginPage() {
   const { session } = useSession();
   const [query] = useSearchParams();
   const requestId = query.get("requestId") || "";
-  const [context, setContext] = useState<{
-    localEnabled: boolean;
-    providers: { id: string; name: string }[];
-    applicationName?: string;
-  }>({ localEnabled: true, providers: [] });
+  const [context, setContext] = useState<{ applicationName?: string }>({});
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   useEffect(() => {
@@ -64,9 +60,7 @@ export function LoginPage() {
       ? api<typeof context>(
           `/auth/context?requestId=${encodeURIComponent(requestId)}`,
         )
-      : api<{ id: string; name: string }[]>("/auth/providers").then(
-          (providers) => ({ localEnabled: true, providers }),
-        )
+      : Promise.resolve({})
     )
       .then((v) => {
         if (live) setContext(v);
@@ -120,53 +114,33 @@ export function LoginPage() {
           className="form-alert"
         />
       )}
-      {context.localEnabled && (
-        <Form layout="vertical" onFinish={submit} requiredMark={false}>
-          <Form.Item
-            name="username"
-            label={t("username")}
-            rules={[{ required: true, message: t("required") }]}
-          >
-            <Input size="large" autoComplete="username" />
-          </Form.Item>
-          <Form.Item
-            name="password"
-            label={t("password")}
-            rules={[{ required: true, message: t("required") }]}
-          >
-            <Input.Password size="large" autoComplete="current-password" />
-          </Form.Item>
-          <Button
-            aria-label={t("signIn")}
-            size="large"
-            type="primary"
-            htmlType="submit"
-            block
-            loading={busy}
-          >
-            {t("signIn")}
-            <ArrowRightOutlined />
-          </Button>
-        </Form>
-      )}
-      {context.providers.length > 0 && (
-        <>
-          <Divider plain>{t("externalLogin")}</Divider>
-          <Space orientation="vertical" className="full-width">
-            {context.providers.map((p) => (
-              <Button
-                key={p.id}
-                size="large"
-                block
-                href={`/api/v1/auth/providers/${encodeURIComponent(p.id)}/login${requestId ? "?requestId=" + encodeURIComponent(requestId) : ""}`}
-              >
-                {p.name}
-                <ArrowRightOutlined />
-              </Button>
-            ))}
-          </Space>
-        </>
-      )}
+      <Form layout="vertical" onFinish={submit} requiredMark={false}>
+        <Form.Item
+          name="username"
+          label={t("username")}
+          rules={[{ required: true, message: t("required") }]}
+        >
+          <Input size="large" autoComplete="username" />
+        </Form.Item>
+        <Form.Item
+          name="password"
+          label={t("password")}
+          rules={[{ required: true, message: t("required") }]}
+        >
+          <Input.Password size="large" autoComplete="current-password" />
+        </Form.Item>
+        <Button
+          aria-label={t("signIn")}
+          size="large"
+          type="primary"
+          htmlType="submit"
+          block
+          loading={busy}
+        >
+          {t("signIn")}
+          <ArrowRightOutlined />
+        </Button>
+      </Form>
     </AuthFrame>
   );
 }

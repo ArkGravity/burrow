@@ -1,6 +1,6 @@
 # OIDC 适配边界
 
-协议层继续使用 `github.com/zitadel/oidc/v3`。Burrow 实现 `op.Storage`、客户端与授权请求接口，并在 HTTP 边界收窄到首版支持的能力。协议库负责标准请求处理和令牌签名；Burrow 负责用户、统一会话、认证来源和 APP 权限。
+协议层继续使用 `github.com/zitadel/oidc/v3`。Burrow 实现 `op.Storage`、客户端与授权请求接口，并在 HTTP 边界收窄到首版支持的能力。协议库负责标准请求处理和令牌签名；Burrow 负责用户、密码认证、统一会话和 APP 权限。
 
 | 位置                                 | 约束                                                                            |
 | ------------------------------------ | ------------------------------------------------------------------------------- |
@@ -15,22 +15,20 @@
 
 不支持的 grant 与扩展显式拒绝，不开放动态注册、Refresh Token、Client Credentials、密码授权或 introspection。Access Token 仅供本站 UserInfo 使用。退出撤销 Burrow 会话，不控制 APP 自身会话；已签发的离线 ID Token 仍按其过期时间处理。
 
-## 应用和上游 Provider
+## 应用和密码认证
 
 Applications 登记使用 Burrow 登录的下游客户端（如 Grafana、Harbor、Nightingale）。Burrow 在此充当 IdP，应用使用 Burrow 签发的凭据调用其 OIDC 端点。具有 `applications:write` 权限的管理用户可在创建时填写可选 `clientId`、Web `clientSecret`；省略或空字符串自动生成。Client ID 只接受最多 128 个字母、数字和 `-._~`，必须唯一；Secret 为 16–256 个不含空格的可打印 ASCII 字符，仅存哈希并在创建响应中返回一次。SPA 不接受非空 Secret。Client ID/类型创建后不可修改，更新请求不能提交 Secret；通过独立重置接口生成新密钥。审计不记录明文密钥。无需数据库迁移。
 
-Providers 登记 Burrow 信任的上游 OIDC IdP。Burrow 在此充当客户端，Provider 的 Client ID/Secret 来自上游 IdP 的应用注册，Secret 必须加密保存，以便 Burrow 调用上游 token 端点。它们不是下游 Application 凭据，不能互相替代。应用的 Provider 关联决定该应用允许哪些上游认证来源；上游身份仍需提前关联到本地用户，不自动开户或按邮箱匹配。
+Burrow 使用本地账号密码认证用户，向下游应用提供 OIDC 登录。上游 Provider、外部身份绑定和用户/应用认证来源配置已移除。创建用户必须设置临时密码；强制改密完成前不允许 OIDC 授权或换码。会话只接受密码认证来源，授权、换码和 UserInfo 均检查当前会话及用户/应用权限。升级到 schema v4 的前置检查和恢复方式见 [升级说明](../operations/recovery.md#upgrade-to-password-only-authentication)。
 
 ## Web 应用 PKCE 兼容
 
 应用字段 `allowWithoutPkce` 默认为 `false`。只有 Administrator 可修改此设置，具有 `applications:write` 的普通角色可以维护应用其他字段。SPA 不允许开启。新建应用省略字段时保持强制 PKCE，编辑时省略字段保留原值；迁移 `002_pkce_compatibility.sql` 为已有应用设置 `false`。设置变化与管理审计同事务提交，事件 `Details` 记录 `allowWithoutPkce.before` 和 `allowWithoutPkce.after`，审计失败回滚修改。
 
-开启后仅允许 Web 授权请求同时省略 challenge 和 method；携带 PKCE 时仍完整验证 S256，拒绝 `plain`、参数不完整、非法 challenge、缺失或错误 verifier。没有 challenge 的换码请求也不能额外提交 verifier。Web 仍必须使用 `client_secret_basic`。精确回调、授权码有效期和原子一次性消费、当前用户/会话/APP/认证来源/权限检查保持生效。关闭兼容后，未兑换的无 PKCE 授权码立即不能兑换；不追溯撤销已经签发的 Token 或 APP 会话。Discovery 仍只声明 S256。
+开启后仅允许 Web 授权请求同时省略 challenge 和 method；携带 PKCE 时仍完整验证 S256，拒绝 `plain`、参数不完整、非法 challenge、缺失或错误 verifier。没有 challenge 的换码请求也不能额外提交 verifier。Web 仍必须使用 `client_secret_basic`。精确回调、授权码有效期和原子一次性消费、当前用户/会话/APP/权限检查保持生效。关闭兼容后，未兑换的无 PKCE 授权码立即不能兑换；不追溯撤销已经签发的 Token 或 APP 会话。Discovery 仍只声明 S256。
 
 此选项降低授权码注入防护，用于兼容不能修改的服务端客户端，不提供与 PKCE 等价的保护。客户端应正确绑定和验证 state；采用 nonce 防护时必须在使用令牌前验证其与浏览器事务匹配。它不替客户端完成这些检查，也不增加 Refresh Token 或跨应用退出。
 
 Nightingale v9.1.1 可作为兼容目标：登记为 Web，显式开启此选项，Scopes 设置为 `openid profile email`（去掉默认 `phone`），用户名映射 `preferred_username`、昵称映射 `name`、邮箱映射 `email`。该版本 OIDC 登录未显式使用 PKCE 或 nonce，仍需按部署环境评估剩余风险。源码：[OIDC 客户端](https://github.com/ccfos/nightingale/blob/v9.1.1/pkg/oidcx/oidc.go)。本仓库独立客户端回归不代表已完成真实夜莺联调。
-
-上游使用同库 RP 实现，但拥有独立的浏览器绑定事务、state、nonce 与 PKCE。回调必须匹配预关联的 Provider、issuer、sub，不按邮箱自动绑定。交互式上游登录要求新认证时间；Provider 网络访问通过地址检查、可选 CIDR 白名单及受限 HTTP 客户端执行。
 
 独立互操作客户端见 [examples](../../examples/README.md)，实际覆盖见 [协议验证记录](../testing/oidc-conformance.md)。本项目未进行 OpenID Foundation 认证，不能据此宣称认证通过。

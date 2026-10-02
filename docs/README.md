@@ -11,6 +11,7 @@ targets and Docker Compose deployment.
 - [Dependencies and implementation layout](development/dependencies.md)
 - [Seed and default role boundaries](development/seed.md)
 - [OIDC adapter boundaries](development/oidc-adapter.md)
+- [MFA proposal awaiting review (not implemented)](development/mfa-proposal.md)
 - [Independent Web and SPA clients](../examples/README.md)
 
 ## Operations and verification
@@ -29,3 +30,7 @@ targets and Docker Compose deployment.
 Historical plans describe decisions made during the initial implementation.
 Use the current README and configuration reference for executable commands;
 older environment-only setup instructions have been replaced by YAML defaults.
+
+Upstream Provider support was removed in schema v4. The older design and plan
+retain their historical OP/RP scope; current authentication uses Burrow passwords.
+See [upgrade guidance](operations/recovery.md#upgrade-to-password-only-authentication).

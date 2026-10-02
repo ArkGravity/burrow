@@ -25,29 +25,30 @@ put secrets in the tracked default file: it is embedded into the binary.
 
 ## Fields
 
-| YAML field                 | Environment override             | Default                                            |
-| -------------------------- | -------------------------------- | -------------------------------------------------- |
-| `env`                      | `BURROW_ENV`                     | `dev`                                              |
-| `server.listen_addr`       | `BURROW_LISTEN_ADDR`             | `:8080`                                            |
-| `server.issuer`            | `BURROW_ISSUER`                  | `http://localhost:8080`                            |
-| `server.static_dir`        | `BURROW_STATIC_DIR`              | `web/dist` (non-embedded builds)                   |
-| `server.trusted_proxies`   | `BURROW_TRUSTED_PROXIES`         | Empty; trust no forwarded client IPs               |
-| `database.driver`          | `BURROW_DB_DRIVER`               | `sqlite`                                           |
-| `database.dsn`             | `BURROW_DB_DSN`                  | `burrow.db`                                        |
-| `security.master_key`      | `BURROW_MASTER_KEY`              | Public development example (production rejects it) |
-| `security.master_key_file` | `BURROW_MASTER_KEY_FILE`         | `data/master.key`                                  |
-| `session.ttl`              | `BURROW_SESSION_TTL`             | `8h`                                               |
-| `oidc.token_ttl`           | `BURROW_TOKEN_TTL`               | `5m`                                               |
-| `oidc.auth_code_ttl`       | `BURROW_AUTH_CODE_TTL`           | `60s`                                              |
-| `oidc.login_ttl`           | `BURROW_LOGIN_TTL`               | `10m`                                              |
-| `providers.allowed_cidrs`  | `BURROW_PROVIDER_ALLOWED_CIDRS`  | Empty; private addresses denied                    |
-| `providers.allow_private`  | `BURROW_ALLOW_PRIVATE_PROVIDERS` | `false`; development-only network bypass           |
-| `audit.retention`          | `BURROW_EVENT_RETENTION`         | `2160h` (90 days)                                  |
+| YAML field                 | Environment override     | Default                                            |
+| -------------------------- | ------------------------ | -------------------------------------------------- |
+| `env`                      | `BURROW_ENV`             | `dev`                                              |
+| `server.listen_addr`       | `BURROW_LISTEN_ADDR`     | `:8080`                                            |
+| `server.issuer`            | `BURROW_ISSUER`          | `http://localhost:8080`                            |
+| `server.static_dir`        | `BURROW_STATIC_DIR`      | `web/dist` (non-embedded builds)                   |
+| `server.trusted_proxies`   | `BURROW_TRUSTED_PROXIES` | Empty; trust no forwarded client IPs               |
+| `database.driver`          | `BURROW_DB_DRIVER`       | `sqlite`                                           |
+| `database.dsn`             | `BURROW_DB_DSN`          | `burrow.db`                                        |
+| `security.master_key`      | `BURROW_MASTER_KEY`      | Public development example (production rejects it) |
+| `security.master_key_file` | `BURROW_MASTER_KEY_FILE` | `data/master.key`                                  |
+| `session.ttl`              | `BURROW_SESSION_TTL`     | `8h`                                               |
+| `oidc.token_ttl`           | `BURROW_TOKEN_TTL`       | `5m`                                               |
+| `oidc.auth_code_ttl`       | `BURROW_AUTH_CODE_TTL`   | `60s`                                              |
+| `oidc.login_ttl`           | `BURROW_LOGIN_TTL`       | `10m`                                              |
+| `audit.retention`          | `BURROW_EVENT_RETENTION` | `2160h` (90 days)                                  |
 
 CIDR lists are YAML sequences or comma-separated environment values. Production
 requires PostgreSQL and an HTTPS issuer without a path, query or credentials.
-Use explicit Provider CIDRs for internal upstream servers instead of a broad
-development bypass.
+
+Upstream Provider settings were removed. Delete the `providers` section from
+older YAML files before running the new version: unknown YAML fields are rejected.
+Remove `BURROW_PROVIDER_ALLOWED_CIDRS` and `BURROW_ALLOW_PRIVATE_PROVIDERS` from
+service environments; these variables no longer have an effect.
 
 ## Master key lifecycle
 
@@ -66,7 +67,7 @@ a missing key.
 For an existing database, reuse its original key. Put the previous value in the
 ignored local YAML, or clear `master_key` and point `master_key_file` at the
 original file. A new key, including the public development default, cannot
-decrypt an existing database's signing keys or Provider credentials.
+decrypt an existing database's signing keys.
 
 Back up the database and key together. Key rotation through `keys-rotate` rotates
 OIDC signing keys, not the master encryption key. See [recovery](../operations/recovery.md).

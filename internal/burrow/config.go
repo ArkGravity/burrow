@@ -11,7 +11,6 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"time"
 
@@ -44,10 +43,6 @@ type fileConfig struct {
 		AuthCodeTTL time.Duration `yaml:"auth_code_ttl"`
 		LoginTTL    time.Duration `yaml:"login_ttl"`
 	} `yaml:"oidc"`
-	Providers struct {
-		AllowedCIDRs []string `yaml:"allowed_cidrs"`
-		AllowPrivate bool     `yaml:"allow_private"`
-	} `yaml:"providers"`
 	Audit struct {
 		Retention time.Duration `yaml:"retention"`
 	} `yaml:"audit"`
@@ -120,20 +115,12 @@ func LoadConfigFile(path string) (Config, error) {
 			return Config{}, fmt.Errorf("%s must be a positive duration", name)
 		}
 	}
-	for name, target := range map[string]*[]string{"TRUSTED_PROXIES": &f.Server.TrustedProxies, "PROVIDER_ALLOWED_CIDRS": &f.Providers.AllowedCIDRs} {
-		if value, ok := os.LookupEnv("BURROW_" + name); ok {
-			*target = strings.Split(value, ",")
-		}
-	}
-	if value, ok := os.LookupEnv("BURROW_ALLOW_PRIVATE_PROVIDERS"); ok {
-		f.Providers.AllowPrivate, err = strconv.ParseBool(value)
-		if err != nil {
-			return Config{}, errors.New("invalid BURROW_ALLOW_PRIVATE_PROVIDERS boolean")
-		}
+	if value, ok := os.LookupEnv("BURROW_TRUSTED_PROXIES"); ok {
+		f.Server.TrustedProxies = strings.Split(value, ",")
 	}
 	c := Config{Env: f.Env, ListenAddr: f.Server.ListenAddr, Issuer: strings.TrimRight(f.Server.Issuer, "/"), StaticDir: f.Server.StaticDir,
 		Bootstrap: f.Bootstrap,
-		DBDriver:  f.Database.Driver, DBDSN: f.Database.DSN, AllowPrivateProviders: f.Providers.AllowPrivate,
+		DBDriver:  f.Database.Driver, DBDSN: f.Database.DSN,
 		SessionTTL: f.Session.TTL, TokenTTL: f.OIDC.TokenTTL, AuthCodeTTL: f.OIDC.AuthCodeTTL, LoginTTL: f.OIDC.LoginTTL, EventRetention: f.Audit.Retention}
 	if c.Env == "development" {
 		c.Env = "dev"
@@ -157,24 +144,15 @@ func LoadConfigFile(path string) (Config, error) {
 	if err != nil || u.Host == "" || u.User != nil || u.RawQuery != "" || u.Fragment != "" || u.Path != "" || (u.Scheme != "https" && !(c.Env == "dev" && u.Scheme == "http")) {
 		return c, errors.New("invalid issuer (production requires HTTPS, no path/query)")
 	}
-	for _, entry := range []struct {
-		values []string
-		target *[]netip.Prefix
-		name   string
-	}{
-		{f.Server.TrustedProxies, &c.TrustedProxies, "server.trusted_proxies"},
-		{f.Providers.AllowedCIDRs, &c.ProviderAllowedCIDRs, "providers.allowed_cidrs"},
-	} {
-		for _, value := range entry.values {
-			if strings.TrimSpace(value) == "" {
-				continue
-			}
-			prefix, err := netip.ParsePrefix(strings.TrimSpace(value))
-			if err != nil {
-				return c, fmt.Errorf("invalid %s CIDR", entry.name)
-			}
-			*entry.target = append(*entry.target, prefix)
+	for _, value := range f.Server.TrustedProxies {
+		if strings.TrimSpace(value) == "" {
+			continue
 		}
+		prefix, err := netip.ParsePrefix(strings.TrimSpace(value))
+		if err != nil {
+			return c, errors.New("invalid server.trusted_proxies CIDR")
+		}
+		c.TrustedProxies = append(c.TrustedProxies, prefix)
 	}
 	encoded := f.Security.MasterKey
 	if encoded == "" {

@@ -15,7 +15,7 @@ func TestAuthorizationRevocationAtExchange(t *testing.T) {
 		t.Run(driver, func(t *testing.T) {
 			b, _, _ := testServer(t, driver)
 			app := testApp(t, b, "spa")
-			u := User{ID: random(18), Username: "member", Enabled: true, LocalEnabled: true}
+			u := User{ID: random(18), Username: "member", Enabled: true}
 			u.PasswordHash, _ = passwordHash(testPassword)
 			b.DB.Create(&u)
 			role := Role{ID: random(18), Name: "application user"}

@@ -87,7 +87,7 @@ func TestNewUsersDefaultToNoRolesAndCanExplicitlyChooseRoles(t *testing.T) {
 				{"explicit-operator", []string{"operator"}, true, []string{"operator"}},
 				{"no-roles", []string{}, true, []string{}},
 			} {
-				body := map[string]any{"username": example.username, "name": example.username, "localEnabled": false}
+				body := map[string]any{"username": example.username, "name": example.username, "password": testPassword}
 				if example.specified {
 					body["roleIds"] = example.roles
 				}
@@ -115,7 +115,7 @@ func TestNewUsersDefaultToNoRolesAndCanExplicitlyChooseRoles(t *testing.T) {
 			// Only users:write is required to create an account with no roles; explicit
 			// authorization changes still require authorization:write.
 			h, _ := passwordHash(testPassword)
-			operator := User{ID: random(18), Username: "provisioner", Enabled: true, LocalEnabled: true, PasswordHash: h}
+			operator := User{ID: random(18), Username: "provisioner", Enabled: true, PasswordHash: h}
 			b.DB.Create(&operator)
 			role := Role{ID: random(18), Name: "provisioner"}
 			b.DB.Create(&role)
@@ -123,10 +123,10 @@ func TestNewUsersDefaultToNoRolesAndCanExplicitlyChooseRoles(t *testing.T) {
 			b.DB.Create(&UserRole{UserID: operator.ID, RoleID: role.ID})
 			limited := newBrowser(b)
 			limited.login(t, operator.Username, testPassword)
-			if w := limited.request("POST", "/api/v1/users", map[string]any{"username": "unassigned-user", "localEnabled": false}, true); w.Code != 201 {
+			if w := limited.request("POST", "/api/v1/users", map[string]any{"username": "unassigned-user", "password": testPassword}, true); w.Code != 201 {
 				t.Fatal(w.Body.String())
 			}
-			if w := limited.request("POST", "/api/v1/users", map[string]any{"username": "escalate", "localEnabled": false, "roleIds": []string{"operator"}}, true); w.Code != 403 {
+			if w := limited.request("POST", "/api/v1/users", map[string]any{"username": "escalate", "password": testPassword, "roleIds": []string{"operator"}}, true); w.Code != 403 {
 				t.Fatal("provisioner assigned explicit roles")
 			}
 		})
@@ -139,11 +139,11 @@ func TestDefaultRoleBoundariesAndUserGroupSummaries(t *testing.T) {
 	for _, role := range []string{"unassigned", "operator"} {
 		if role == "operator" {
 			b.DB.Create(&Role{ID: role, Name: "Application operator"})
-			for _, permission := range []string{"applications:write", "providers:write"} {
+			for _, permission := range []string{"applications:write"} {
 				b.DB.Create(&RolePermission{RoleID: role, PermissionID: permission})
 			}
 		}
-		u := User{ID: random(18), Username: role, Enabled: true, LocalEnabled: true, PasswordHash: h}
+		u := User{ID: random(18), Username: role, Enabled: true, PasswordHash: h}
 		b.DB.Create(&u)
 		if role == "operator" {
 			b.DB.Create(&UserRole{UserID: u.ID, RoleID: role})
@@ -163,14 +163,10 @@ func TestDefaultRoleBoundariesAndUserGroupSummaries(t *testing.T) {
 			t.Fatal("default role manages authorization")
 		}
 		if role == "unassigned" {
-			for _, resource := range []string{"users", "groups", "roles", "permissions", "applications", "providers"} {
+			for _, resource := range []string{"users", "groups", "roles", "permissions", "applications"} {
 				if w := c.request("GET", "/api/v1/"+resource, nil, false); w.Code != 403 {
 					t.Fatal("Viewer reads management resources")
 				}
-			}
-		} else {
-			if w := c.request("POST", "/api/v1/providers", map[string]any{"name": "upstream", "issuer": "https://issuer.example", "clientId": "rp", "clientSecret": "test-only"}, true); w.Code != 201 {
-				t.Fatal(w.Body.String())
 			}
 		}
 	}
@@ -193,7 +189,7 @@ func TestDefaultRoleBoundariesAndUserGroupSummaries(t *testing.T) {
 	}
 	// Groups displayed on a user are part of users:read, not an implicit grant
 	// to inspect every group's members and authorization settings.
-	reader := User{ID: random(18), Username: "user-reader", Enabled: true, LocalEnabled: true, PasswordHash: h}
+	reader := User{ID: random(18), Username: "user-reader", Enabled: true, PasswordHash: h}
 	b.DB.Create(&reader)
 	readRole := Role{ID: random(18), Name: "User reader"}
 	b.DB.Create(&readRole)

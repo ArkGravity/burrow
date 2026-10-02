@@ -15,13 +15,6 @@ func inNetworks(ip netip.Addr, networks []netip.Prefix) bool {
 	}
 	return false
 }
-func (b *Server) providerAddressAllowed(ip net.IP) bool {
-	addr, ok := netip.AddrFromSlice(ip)
-	if !ok {
-		return false
-	}
-	return !restrictedIP(ip) || inNetworks(addr, b.Config.ProviderAllowedCIDRs) || (b.Config.Env == "dev" && b.Config.AllowPrivateProviders)
-}
 func (b *Server) clientIP(r *http.Request) string {
 	host, _, err := net.SplitHostPort(r.RemoteAddr)
 	if err != nil {
