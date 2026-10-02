@@ -140,8 +140,10 @@ preserve the browser Origin, and configure trusted proxy CIDRs for forwarded
 client addresses. Burrow runs as a single instance and needs no Redis or queue.
 
 Use separate, untracked `.env.dev` and `.env.prod` files and project names to
-isolate deployments. Set `BURROW_IMAGE` to a fixed image tag or digest when using
-your own registry. For an external PostgreSQL database, omit the local profile:
+isolate deployments. Set `BURROW_IMAGE` to a fixed image tag or digest, such as
+`ghcr.io/arkgravity/burrow:main-<short-sha>` or
+`docker.io/logic3579/burrow:main-<short-sha>` (the default Docker Hub namespace).
+For an external PostgreSQL database, omit the local profile:
 
 ```bash
 docker compose --env-file .env.prod --project-name burrow-prod pull app migrate seed
@@ -150,8 +152,9 @@ make compose-up COMPOSE_ENV=.env.prod COMPOSE_PROJECT=burrow-prod COMPOSE_PROFIL
 
 `make compose-down` preserves database volumes. Preserve the database, master key
 and Compose project name across upgrades. Read the [backup and recovery guide](docs/operations/recovery.md)
-before migrating or rotating keys. This repository does not automatically publish
-container images.
+before migrating or rotating keys. CI publishes images from `main` after all
+checks pass and the registry credentials are configured; see the
+[CI and image publishing guide](docs/development/ci.md).
 
 ## OIDC and access management
 
@@ -216,8 +219,11 @@ See the [adapter notes](docs/development/oidc-adapter.md) and [client examples](
 [docs/README.md](docs/README.md) indexes configuration, dependencies, operations,
 protocol verification and historical design documents.
 
-[CI](.github/workflows/ci.yml) runs Go race tests against PostgreSQL 17, static
-analysis, frontend checks, Chromium flows and Compose configuration validation.
+[CI](.github/workflows/ci.yml) runs Go race tests against SQLite and PostgreSQL 17,
+static analysis, frontend checks and builds, Chromium flows, Compose configuration
+validation and container builds in parallel. Successful `main` runs then publish
+the image to GHCR and Docker Hub. See [CI setup](docs/development/ci.md) for
+triggers, image tags and registry credentials.
 Local verification scope and limitations are recorded in the
 [verification report](docs/testing/oidc-conformance.md). Engineering interoperability
 tests are not an OpenID Foundation certification.

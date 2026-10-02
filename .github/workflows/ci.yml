@@ -1,10 +1,56 @@
 name: CI
-on: [push, pull_request]
+
+on:
+  push:
+    branches: [main, dev]
+  pull_request:
+  workflow_dispatch:
+
 permissions:
   contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
 jobs:
-  verify:
+  web:
+    name: Web checks
     runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.4.2"
+      - name: Install locked dependencies
+        run: bun install --frozen-lockfile
+      - name: Typecheck
+        run: bun run typecheck
+      - name: Unit tests
+        run: bun run test
+      - name: Build frontend
+        run: bun run build
+
+  backend-quality:
+    name: Backend quality
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: Static analysis
+        run: make lint
+
+  backend-test:
+    name: Backend SQLite and PostgreSQL tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
     services:
       postgres:
         image: postgres:17-alpine
@@ -13,35 +59,133 @@ jobs:
           POSTGRES_PASSWORD: ci-test-only
           POSTGRES_DB: burrow_test
         ports: ["5432:5432"]
-        options: --health-cmd='pg_isready -U burrow' --health-interval=5s --health-retries=10
+        options: >-
+          --health-cmd "pg_isready -U burrow -d burrow_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
     env:
       BURROW_TEST_POSTGRES_DSN: host=127.0.0.1 port=5432 user=burrow password=ci-test-only dbname=burrow_test sslmode=disable
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with:
-          go-version: "1.27.1"
+          go-version-file: go.mod
+      - name: Race tests on both database drivers
+        run: make test-db
+
+  browser:
+    name: Browser and OIDC regression tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: "1.4.2"
-      - run: go test -race ./... -count=1
-      - run: go vet ./...
-      - run: bun install --frozen-lockfile
+      - name: Install locked frontend dependencies
+        run: make web-install
+      - name: Install Chromium and system dependencies
+        run: bun x playwright install --with-deps chromium
         working-directory: web
-      - run: bun run typecheck && bun run test
-        working-directory: web
-      - run: bun x playwright install --with-deps chromium
-        working-directory: web
-      - run: bun install --frozen-lockfile
-        working-directory: examples/spa-client
-      - run: sh web/e2e/run.sh
-      - run: docker compose config --quiet
-        env:
-          BURROW_DB_DSN: host=postgres user=burrow password=ci-test-only dbname=burrow sslmode=disable
-          POSTGRES_PASSWORD: ci-test-only
-          BURROW_MASTER_KEY: MDEyMzQ1Njc4OTAxMjM0NTY3ODkwMTIzNDU2Nzg5MDE=
+      - name: Run browser tests with independent OIDC clients
+        run: make test-e2e
       - uses: actions/upload-artifact@v4
         if: failure()
         with:
           name: browser-test-results
           path: web/test-results/
+
+  image-build:
+    name: Docker build and Compose validation
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate deployment configuration
+        run: make compose-config COMPOSE_ENV=.env.example
+      - uses: docker/setup-buildx-action@v3
+      - name: Build container image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Dockerfile
+          platforms: linux/amd64
+          push: false
+          cache-from: type=gha,scope=burrow-image
+          cache-to: type=gha,scope=burrow-image,mode=max
+
+  # Keep the existing check name while collecting every verification job.
+  verify:
+    if: always()
+    needs: [web, backend-quality, backend-test, browser, image-build]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Require all checks to pass
+        env:
+          CHECK_RESULTS: ${{ join(needs.*.result, ' ') }}
+        run: |
+          for result in $CHECK_RESULTS; do
+            if [ "$result" != "success" ]; then
+              echo '::error::A required CI job did not succeed.'
+              exit 1
+            fi
+          done
+
+  image:
+    name: Publish image to GHCR and Docker Hub
+    if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref == 'refs/heads/main'
+    needs: [verify]
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      packages: write
+    env:
+      DOCKERHUB_USERNAME: ${{ vars.DOCKERHUB_USERNAME || secrets.DOCKERHUB_USERNAME || 'logic3579' }}
+      DOCKERHUB_NAMESPACE: ${{ vars.DOCKERHUB_NAMESPACE || 'logic3579' }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check publishing configuration
+        env:
+          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+        run: |
+          test -n "$DOCKERHUB_USERNAME" || { echo '::error::Set DOCKERHUB_USERNAME variable'; exit 1; }
+          test -n "$DOCKERHUB_NAMESPACE" || { echo '::error::Set DOCKERHUB_NAMESPACE variable'; exit 1; }
+          test -n "$DOCKERHUB_TOKEN" || { echo '::error::Set DOCKERHUB_TOKEN secret'; exit 1; }
+      - uses: docker/setup-buildx-action@v3
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ env.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - name: Generate image metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: |
+            ghcr.io/${{ github.repository }}
+            docker.io/${{ env.DOCKERHUB_NAMESPACE }}/burrow
+          flavor: latest=false
+          tags: type=sha,prefix=main-,format=short
+      - name: Build and push to both registries
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Dockerfile
+          platforms: linux/amd64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha,scope=burrow-image
+          cache-to: type=gha,scope=burrow-image,mode=max
