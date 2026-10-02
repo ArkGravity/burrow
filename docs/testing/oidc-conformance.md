@@ -1,12 +1,21 @@
 # 协议与回归验证记录
 
-## 2026-10-02：v0.1.0 发布准备（尚未发布）
+## 2026-10-02：v0.1.0 正式发布
+
+- 用户明确要求正式发布后，[Burrow v0.1.0](https://github.com/ArkGravity/burrow/releases/tag/v0.1.0) 于 `2026-10-02T14:53:59Z` 发布。GitHub API 确认 `draft=false`、`prerelease=false`，Latest Release 为 `v0.1.0`，五个附件均为 uploaded。版本 tag 指向 `523ff526043b7bc430c88baf53a396f2861595f9`；后续文档状态同步不移动该 tag。
+- 发布准备 [PR #4](https://github.com/ArkGravity/burrow/pull/4) 在[完整 PR CI](https://github.com/ArkGravity/burrow/actions/runs/37018008591) 通过后 squash 合并；该提交的 [main CI](https://github.com/ArkGravity/burrow/actions/runs/37018533674) 全部通过，包括前端检查/构建、Go 静态检查、17 项发布门禁/打包测试、SQLite/PostgreSQL race、Chromium、Linux amd64 容器构建、静默 Compose 校验及双仓库镜像发布。
+- [v0.1.0 Release 工作流](https://github.com/ArkGravity/burrow/actions/runs/37020493982) 的 validate、prepare、draft 全部通过。对镜像中提取并打包的真实 Linux amd64 二进制运行四条 Chromium/MFA/OIDC 流程；独立 PostgreSQL 17 验证生产模式镜像的迁移、重复 seed、启动、readiness、healthcheck 与内嵌前端。这些临时工程验证不代表生产部署或官方 OIDC 认证；此前三应用/MFA 人工验收保持独立。
+- 五个附件（Linux 二进制归档、Compose 部署归档、`INSTALL.md`、`IMAGES.txt`、`SHA256SUMS`）全部下载复核，校验和、归档清单、MIT、配置样例、原封不动根 Compose 和固定镜像行均正确。下载二进制在容器内实际执行 `version`，返回 `v0.1.0`、上述提交和 `2026-10-02T16:14:55+02:00` 构建时间；Go 元信息确认 Linux/amd64、CGO 与 embedweb。镜像程序与下载包程序 SHA256 均为 `2b4140d784a53f4fc932ff279aaa9357acf2c401af1742a80ae7225d239ba1cb`。
+- `ghcr.io/arkgravity/burrow:v0.1.0` 与 `docker.io/logic3579/burrow:v0.1.0` 的匿名 manifest 请求均 HTTP 200，共同 digest 为 `sha256:73b84e43a4ac697efdb5326b7c2eb1309cb02f58bd05a2ad050e7e8daa968d02`。本机实际拉取 GHCR 版本镜像并运行下载程序成功，临时容器已清理；没有修改真实数据库、包可见性或部署生产。
+- 正式发布确认回合核查 Release/Latest 状态、附件与文档；上面的 Go、浏览器和容器结果来自同一版本提交已成功执行的工作流，不重复未变化的产品套件。
+
+## 2026-10-02：v0.1.0 发布准备（本地实现阶段）
 
 - 用户确认采用 MIT。新增 `burrow version`、构建版本注入、固定版本发布工作流、安装/升级说明、部署归档和校验文件；认证逻辑与迁移 001–005 未修改。
 - 发布门禁及打包共 17 项本地测试通过，覆盖错误 tag、未合并提交、错误提交/分支/事件的 CI、失败/缺失 CI、API 失败、重复发布、草稿重试、缺失说明、归档文件清单、许可证、固定镜像和 SHA256。打包测试使用 ELF 头部夹具，只验证打包行为，不代表真实 Linux 二进制已运行。
 - `make build VERSION=v0.1.0` 与 `make lint` 通过；本机产物为 macOS arm64。版本命令在错误配置/环境下仍可读取构建信息，非法参数被拒绝。通过 `BURROW_E2E_BINARY` 指定此二进制，四条 Chromium 回归全部通过，覆盖用户/权限/双语主题、Web/SPA SSO、单 Web PKCE 兼容、MFA 过期/重置及 CLI 恢复；使用临时 SQLite，未修改真实数据库。
 - actionlint 1.7.12、Shell 语法、Prettier、55 个本地文档链接、静默根 Compose 配置与 diff 检查通过；浏览器临时服务已退出，测试端口与 Docker 无遗留容器。本轮未重跑完整双数据库 race 套件；发布工作流要求最终提交的完整 main CI，并另验证打包后的 Linux 二进制与生产模式 PostgreSQL 容器启动。
-- 尝试本机 Linux amd64 镜像构建，但 Docker Hub 的 Bun、Go、Debian 基础镜像元数据访问超时，构建未完成。尚未提交/推送、创建版本 tag、执行远端发布工作流、上传附件或验证新版本镜像公开拉取；没有发布 Release 或部署生产。现有 main CI 与双仓库发布成功属于先前提交，不能替代本次版本的验证。
+- 本地实现阶段尝试 Linux amd64 镜像构建，但 Docker Hub 的 Bun、Go、Debian 基础镜像元数据访问超时，构建未完成。当时尚未提交/推送、创建版本 tag、执行远端发布工作流、上传附件或验证新版本镜像公开拉取，没有发布 Release 或部署生产；随后远端验证与正式发布结果见上节。
 
 ## 2026-10-02：强制 MFA 实现与回归
 

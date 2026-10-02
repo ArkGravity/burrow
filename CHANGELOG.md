@@ -1,8 +1,9 @@
 # Changelog
 
-## v0.1.0 (release preparation)
+## v0.1.0 (2026-10-02)
 
 First release of Burrow, a single-organization OpenID Connect identity provider.
+Published as [Burrow v0.1.0](https://github.com/ArkGravity/burrow/releases/tag/v0.1.0).
 
 - Password authentication and mandatory TOTP, shared SSO, forced temporary
   password changes and administrator/operator MFA recovery.

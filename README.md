@@ -12,10 +12,10 @@ application access. The Go backend and React web UI ship as one `burrow` binary.
 The UI supports English and Simplified Chinese, with light, dark and system themes.
 PostgreSQL is used in production; SQLite is available for local development.
 
-Burrow uses the [MIT license](LICENSE). Version `v0.1.0` is being prepared;
+Burrow uses the [MIT license](LICENSE). [Version `v0.1.0`](https://github.com/ArkGravity/burrow/releases/tag/v0.1.0) is available;
 see [release notes](docs/releases/v0.1.0.md), [installation instructions](docs/releases/INSTALL.md)
-and the [changelog](CHANGELOG.md). Published packages will appear under
-[GitHub Releases](https://github.com/ArkGravity/burrow/releases).
+and the [changelog](CHANGELOG.md) for Linux amd64 binaries, container images and
+deployment packages.
 
 ## Layout
 
