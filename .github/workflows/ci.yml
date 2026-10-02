@@ -59,7 +59,11 @@ jobs:
           POSTGRES_PASSWORD: ci-test-only
           POSTGRES_DB: burrow_test
         ports: ["5432:5432"]
-        options: --health-cmd='pg_isready -U burrow' --health-interval=5s --health-retries=10
+        options: >-
+          --health-cmd "pg_isready -U burrow -d burrow_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
     env:
       BURROW_TEST_POSTGRES_DSN: host=127.0.0.1 port=5432 user=burrow password=ci-test-only dbname=burrow_test sslmode=disable
     steps:
