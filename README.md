@@ -12,6 +12,11 @@ application access. The Go backend and React web UI ship as one `burrow` binary.
 The UI supports English and Simplified Chinese, with light, dark and system themes.
 PostgreSQL is used in production; SQLite is available for local development.
 
+Burrow uses the [MIT license](LICENSE). Version `v0.1.0` is being prepared;
+see [release notes](docs/releases/v0.1.0.md), [installation instructions](docs/releases/INSTALL.md)
+and the [changelog](CHANGELOG.md). Published packages will appear under
+[GitHub Releases](https://github.com/ArkGravity/burrow/releases).
+
 ## Layout
 
 - `cmd/burrow/`: server, migrations, administrator bootstrap and key rotation.
@@ -100,6 +105,7 @@ make build
 ./bin/burrow migrate --config configs/config.yaml
 ./bin/burrow seed --config configs/config.yaml
 ./bin/burrow serve --config configs/config.yaml
+./bin/burrow version
 ```
 
 Open http://localhost:8080. The binary serves the UI, management API and OIDC
@@ -143,6 +149,9 @@ Use separate, untracked `.env.dev` and `.env.prod` files and project names to
 isolate deployments. Set `BURROW_IMAGE` to a fixed image tag or digest, such as
 `ghcr.io/arkgravity/burrow:main-<short-sha>` or
 `docker.io/logic3579/burrow:main-<short-sha>` (the default Docker Hub namespace).
+Version releases use `vX.Y.Z` tags in both registries and include a standalone
+Compose deployment archive. Use the [release installation guide](docs/releases/INSTALL.md)
+for deployment without a source checkout; development images remain available.
 For an external PostgreSQL database, omit the local profile:
 
 ```bash
@@ -227,6 +236,10 @@ triggers, image tags and registry credentials.
 Local verification scope and limitations are recorded in the
 [verification report](docs/testing/oidc-conformance.md). Engineering interoperability
 tests are not an OpenID Foundation certification.
+
+Version tags additionally run the [release workflow](.github/workflows/release.yml)
+to prepare tested binaries, deployment archives, checksums and versioned images
+in a Release draft. See [release preparation and publication](docs/development/releases.md).
 
 MFA setup is mandatory at first login and after an Administrator resets MFA.
 Password login alone creates only a five-minute restricted transaction. Temporary

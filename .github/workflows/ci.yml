@@ -46,6 +46,8 @@ jobs:
           go-version-file: go.mod
       - name: Static analysis
         run: make lint
+      - name: Release gate and packaging regression tests
+        run: python3 -m unittest discover -s scripts/release -p 'test_*.py'
 
   backend-test:
     name: Backend SQLite and PostgreSQL tests
@@ -115,6 +117,7 @@ jobs:
           file: Dockerfile
           platforms: linux/amd64
           push: false
+          build-args: COMMIT=${{ github.sha }}
           cache-from: type=gha,scope=burrow-image
           cache-to: type=gha,scope=burrow-image,mode=max
 
@@ -185,6 +188,7 @@ jobs:
           file: Dockerfile
           platforms: linux/amd64
           push: true
+          build-args: COMMIT=${{ github.sha }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha,scope=burrow-image

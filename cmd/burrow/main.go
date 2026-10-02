@@ -16,6 +16,13 @@ import (
 	"github.com/logic3579/burrow/web"
 )
 
+// Set by release builds; ordinary go run/build retains development defaults.
+var (
+	version   = "dev"
+	commit    = "unknown"
+	buildTime = "unknown"
+)
+
 func main() {
 	if err := run(); err != nil {
 		slog.Error("burrow failed", "error", err)
@@ -29,7 +36,7 @@ func run() error {
 		command, args = args[0], args[1:]
 	}
 	switch command {
-	case "serve", "migrate", "seed", "keys-rotate", "healthcheck", "mfa-reset":
+	case "serve", "migrate", "seed", "keys-rotate", "healthcheck", "mfa-reset", "version":
 	default:
 		return fmt.Errorf("unknown command %q", command)
 	}
@@ -48,6 +55,10 @@ func run() error {
 	}
 	if fs.NArg() != 0 {
 		return fmt.Errorf("unexpected arguments: %s", strings.Join(fs.Args(), " "))
+	}
+	if command == "version" {
+		fmt.Printf("burrow %s\ncommit: %s\nbuilt: %s\n", version, commit, buildTime)
+		return nil
 	}
 	if command == "healthcheck" {
 		url := os.Getenv("BURROW_HEALTHCHECK_URL")

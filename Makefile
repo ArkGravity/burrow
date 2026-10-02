@@ -3,6 +3,10 @@
 GO ?= go
 BUN ?= bun
 PRETTIER ?= prettier
+VERSION ?= dev
+COMMIT ?= $(shell git rev-parse HEAD 2>/dev/null || echo unknown)
+BUILD_TIME ?= $(shell date -u +%Y-%m-%dT%H:%M:%SZ)
+BUILD_LDFLAGS = -X main.version=$(VERSION) -X main.commit=$(COMMIT) -X main.buildTime=$(BUILD_TIME)
 CONFIG ?= configs/config.yaml
 COMPOSE_ENV ?= .env
 COMPOSE_PROJECT ?= burrow
@@ -31,7 +35,7 @@ keys-rotate: ## Rotate OIDC signing keys while retaining existing public keys
 
 build: web ## Build bin/burrow with the frontend embedded
 	@mkdir -p bin
-	$(GO) build -tags embedweb -trimpath -o bin/burrow ./cmd/burrow
+	$(GO) build -tags embedweb -trimpath -ldflags "$(BUILD_LDFLAGS)" -o bin/burrow ./cmd/burrow
 
 test: ## Run Go tests with race detection (PostgreSQL requires its test DSN)
 	$(GO) test -race ./... -count=1
