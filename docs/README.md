@@ -9,6 +9,7 @@ targets and Docker Compose deployment.
 - [Default configuration](../configs/config.yaml)
 - [Configuration loading, overrides and secrets](development/configuration.md)
 - [Dependencies and implementation layout](development/dependencies.md)
+- [CI checks and image publishing](development/ci.md)
 - [Seed and default role boundaries](development/seed.md)
 - [OIDC adapter boundaries](development/oidc-adapter.md)
 - [Mandatory MFA and account recovery](development/mfa-proposal.md)
