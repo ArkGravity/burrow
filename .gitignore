@@ -40,6 +40,8 @@ Desktop.ini
 *.test
 *.out
 *.prof
+__pycache__/
+*.pyc
 
 # Local databases, backups and runtime data
 /data/

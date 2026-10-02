@@ -1,5 +1,13 @@
 # 协议与回归验证记录
 
+## 2026-10-02：v0.1.0 发布准备（尚未发布）
+
+- 用户确认采用 MIT。新增 `burrow version`、构建版本注入、固定版本发布工作流、安装/升级说明、部署归档和校验文件；认证逻辑与迁移 001–005 未修改。
+- 发布门禁及打包共 17 项本地测试通过，覆盖错误 tag、未合并提交、错误提交/分支/事件的 CI、失败/缺失 CI、API 失败、重复发布、草稿重试、缺失说明、归档文件清单、许可证、固定镜像和 SHA256。打包测试使用 ELF 头部夹具，只验证打包行为，不代表真实 Linux 二进制已运行。
+- `make build VERSION=v0.1.0` 与 `make lint` 通过；本机产物为 macOS arm64。版本命令在错误配置/环境下仍可读取构建信息，非法参数被拒绝。通过 `BURROW_E2E_BINARY` 指定此二进制，四条 Chromium 回归全部通过，覆盖用户/权限/双语主题、Web/SPA SSO、单 Web PKCE 兼容、MFA 过期/重置及 CLI 恢复；使用临时 SQLite，未修改真实数据库。
+- actionlint 1.7.12、Shell 语法、Prettier、55 个本地文档链接、静默根 Compose 配置与 diff 检查通过；浏览器临时服务已退出，测试端口与 Docker 无遗留容器。本轮未重跑完整双数据库 race 套件；发布工作流要求最终提交的完整 main CI，并另验证打包后的 Linux 二进制与生产模式 PostgreSQL 容器启动。
+- 尝试本机 Linux amd64 镜像构建，但 Docker Hub 的 Bun、Go、Debian 基础镜像元数据访问超时，构建未完成。尚未提交/推送、创建版本 tag、执行远端发布工作流、上传附件或验证新版本镜像公开拉取；没有发布 Release 或部署生产。现有 main CI 与双仓库发布成功属于先前提交，不能替代本次版本的验证。
+
 ## 2026-10-02：强制 MFA 实现与回归
 
 - Provider 移除已通过 [PR #1](https://github.com/ArkGravity/burrow/pull/1) squash 合并到 `main`（`617cd9e`）；按用户要求直接合并，未检查 CI。本地 main 更新后创建 `feat/mandatory-mfa`，完成以下 MFA 实现与验证。

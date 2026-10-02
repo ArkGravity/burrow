@@ -59,8 +59,10 @@ pushes the same `linux/amd64` image to both registries:
 
 The short SHA is the first seven characters of the workflow commit, matching
 Optimus's tag convention. GHCR derives its image name from `github.repository`
-and normalizes it to lowercase. The workflow does not publish `latest`, release
-tags or images from pull requests and other branches. Every CI run builds the
+and normalizes it to lowercase. The CI workflow does not publish `latest`, release
+tags or images from pull requests and other branches. The separate
+[release workflow](releases.md) prepares fixed version tags and Release drafts.
+Every CI run builds the
 image for verification; publishing reuses the Buildx cache.
 
 Set `BURROW_IMAGE` in the deployment's untracked `.env.prod` to the desired tag
