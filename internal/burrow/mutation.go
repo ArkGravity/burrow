@@ -53,7 +53,7 @@ func (b *Server) sessionDB(db *gorm.DB, r *http.Request) (User, Session, error) 
 	if e = db.Where("id = ? AND enabled = ?", s.UserID, true).First(&u).Error; e != nil {
 		return u, s, e
 	}
-	if s.Method != "password" || u.PasswordHash == "" {
+	if s.Method != "password" || u.PasswordHash == "" || !validMFASession(u, s) {
 		return u, s, errors.New("invalid_authentication_method")
 	}
 	return u, s, nil

@@ -11,7 +11,7 @@ targets and Docker Compose deployment.
 - [Dependencies and implementation layout](development/dependencies.md)
 - [Seed and default role boundaries](development/seed.md)
 - [OIDC adapter boundaries](development/oidc-adapter.md)
-- [MFA proposal awaiting review (not implemented)](development/mfa-proposal.md)
+- [Mandatory MFA and account recovery](development/mfa-proposal.md)
 - [Independent Web and SPA clients](../examples/README.md)
 
 ## Operations and verification

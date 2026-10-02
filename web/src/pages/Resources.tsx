@@ -152,6 +152,9 @@ export function Resources({ resource }: { resource: string }) {
   const [saving, setSaving] = useState(false);
   const [options, setOptions] = useState<Record<string, Row[]>>({});
   const [passwordUser, setPasswordUser] = useState<Row>();
+  const [mfaUser, setMFAUser] = useState<Row>();
+  const [mfaForm] = Form.useForm();
+  const [resettingMFA, setResettingMFA] = useState(false);
   const [form] = Form.useForm();
   const clientType = Form.useWatch("clientType", form);
   const [passwordForm] = Form.useForm();
@@ -309,6 +312,15 @@ export function Resources({ resource }: { resource: string }) {
       ? [
           { title: t("email"), dataIndex: "email", key: "email" },
           {
+            title: "MFA",
+            key: "mfa",
+            render: (_: unknown, row: Row) => (
+              <Tag color={row.mfaEnabled ? "success" : "default"}>
+                {t(row.mfaEnabled ? "mfaBound" : "mfaUnbound")}
+              </Tag>
+            ),
+          },
+          {
             title: t("groups"),
             key: "groups",
             render: (_: unknown, row: Row) => (
@@ -364,6 +376,19 @@ export function Resources({ resource }: { resource: string }) {
                         setPasswordUser(row);
                       }}
                     />
+                    {session?.administrator && (
+                      <Button
+                        size="small"
+                        type="text"
+                        aria-label={t("mfaReset")}
+                        onClick={() => {
+                          mfaForm.resetFields();
+                          setMFAUser(row);
+                        }}
+                      >
+                        {t("mfaReset")}
+                      </Button>
+                    )}
                     <Popconfirm
                       title={t("revokeSessions")}
                       onConfirm={() =>
@@ -598,6 +623,64 @@ export function Resources({ resource }: { resource: string }) {
         <Typography.Paragraph copyable className="secret-value">
           {secret}
         </Typography.Paragraph>
+      </Modal>
+      <Modal
+        title={t("mfaReset")}
+        open={!!mfaUser}
+        onCancel={() => setMFAUser(undefined)}
+        onOk={() => mfaForm.submit()}
+        confirmLoading={resettingMFA}
+      >
+        <Alert
+          type="warning"
+          showIcon
+          title={t("mfaResetHint")}
+          className="form-alert"
+        />
+        <Form
+          form={mfaForm}
+          layout="vertical"
+          onFinish={async (v) => {
+            setResettingMFA(true);
+            try {
+              await write(`/users/${mfaUser!.id}/mfa-reset`, v);
+              setMFAUser(undefined);
+              message.success(t("success"));
+              if (mfaUser!.id === session?.user.id)
+                window.location.assign("/login");
+              else await load();
+            } catch (e) {
+              message.error(t(errorKey((e as APIError).code)));
+            } finally {
+              setResettingMFA(false);
+            }
+          }}
+        >
+          <Form.Item
+            name="code"
+            label={t("mfaCode")}
+            rules={[
+              { required: true, message: t("required") },
+              { pattern: /^[0-9]{6}$/, message: t("mfaCodeHint") },
+            ]}
+          >
+            <Input
+              inputMode="numeric"
+              autoComplete="one-time-code"
+              maxLength={6}
+            />
+          </Form.Item>
+          <Form.Item
+            name="reason"
+            label={t("mfaReason")}
+            rules={[
+              { required: true, whitespace: true, message: t("required") },
+              { max: 500 },
+            ]}
+          >
+            <Input.TextArea maxLength={500} />
+          </Form.Item>
+        </Form>
       </Modal>
       <Modal
         title={t("resetPassword")}

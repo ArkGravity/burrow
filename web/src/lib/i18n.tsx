@@ -1,6 +1,31 @@
 import { createContext, useContext } from "react";
 export type Language = "en" | "zh-CN";
 const en = {
+  mfaBind: "Set up multi-factor authentication",
+  mfaVerify: "Verify your identity",
+  mfaBindHint:
+    "Scan this QR code with your authenticator, or enter the setup key. Enter its six-digit code to finish setup.",
+  mfaVerifyHint:
+    "Enter the current code from your authenticator. Each code can be used only once; wait for the next code if you just used it.",
+  mfaSecret: "Setup key",
+  mfaCode: "Authenticator code",
+  mfaCodeHint: "Enter six digits",
+  mfaContinue: "Verify and continue",
+  mfaRestart: "Start again with password",
+  mfaRecoveryHint:
+    "Lost your authenticator? Contact your administrator to reset MFA. Your next password login will require setup again.",
+  mfaBound: "MFA is bound",
+  mfaUnbound: "Setup required",
+  mfaReset: "Reset MFA",
+  mfaResetHint:
+    "This revokes the user’s Burrow sessions and requires setup at the next password login. Their password remains the same. Enter your own unused authenticator code and a reason.",
+  mfaReason: "Reset reason",
+  mfaInvalidCode:
+    "The code is invalid, expired or already used. After five failures, start again with password.",
+  loginExpired:
+    "This sign-in has expired or changed. Start again with your password.",
+  rateLimited: "Too many attempts. Please wait a minute and try again.",
+
   home: "Overview",
   users: "Users",
   groups: "Groups",
@@ -121,6 +146,30 @@ const en = {
 } as const;
 type Key = keyof typeof en;
 const zh: Record<Key, string> = {
+  mfaBind: "绑定多因素认证",
+  mfaVerify: "验证身份",
+  mfaBindHint:
+    "使用身份验证器扫描二维码，或手动输入绑定密钥，然后输入六位动态码完成绑定。",
+  mfaVerifyHint:
+    "请输入身份验证器当前的动态码。每个动态码只能使用一次，刚使用过时请等待下一组。",
+  mfaSecret: "绑定密钥",
+  mfaCode: "动态验证码",
+  mfaCodeHint: "请输入六位数字",
+  mfaContinue: "验证并继续",
+  mfaRestart: "重新使用密码登录",
+  mfaRecoveryHint:
+    "无法使用身份验证器？请联系管理员重置 MFA，之后使用密码登录并重新绑定。",
+  mfaBound: "MFA 已绑定",
+  mfaUnbound: "待绑定",
+  mfaReset: "重置 MFA",
+  mfaResetHint:
+    "此操作将撤销该用户的 Burrow 会话，下次密码登录时强制重新绑定，密码保持不变。请输入你自己的未使用动态码和重置原因。",
+  mfaReason: "重置原因",
+  mfaInvalidCode:
+    "动态码无效、已过期或已使用。累计五次失败后需重新使用密码登录。",
+  loginExpired: "本次登录已过期或认证状态已改变，请重新使用密码登录。",
+  rateLimited: "尝试次数过多，请等待一分钟后重试。",
+
   home: "总览",
   users: "用户",
   groups: "用户组",
@@ -248,6 +297,9 @@ export function useI18n() {
 }
 export type TranslationKey = Key;
 export function errorKey(code: string): Key {
+  if (/INVALID_MFA_CODE/.test(code)) return "mfaInvalidCode";
+  if (/INVALID_TRANSACTION|INVALID_STEP/.test(code)) return "loginExpired";
+  if (/RATE_LIMITED/.test(code)) return "rateLimited";
   if (/CREDENTIAL|PASSWORD_INVALID/.test(code)) return "invalidCredentials";
   if (/LAST_ADMIN/.test(code)) return "lastAdmin";
   if (/FORBIDDEN|PERMISSION/.test(code)) return "denied";

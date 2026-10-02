@@ -102,3 +102,10 @@ Production first-time seed requires an independent 12–256 character password.
 Development falls back to the example if the password is empty. These settings
 do not change an existing administrator. Keep the original bootstrap username
 when upgrading or restoring an existing instance. See [seed](seed.md).
+
+The OIDC `login_ttl` setting applies to OIDC authorization requests. Password/MFA
+restricted login transactions expire after a fixed five minutes and never extend
+when a temporary password is changed. All users require MFA; there is no configuration
+flag to disable it. Preserve the existing master key, which encrypts active and pending
+TOTP secrets as well as signing keys. `mfa-reset` loads configuration with the same
+precedence as other native commands. See [MFA recovery](../operations/recovery.md#mandatory-mfa-upgrade-and-recovery).

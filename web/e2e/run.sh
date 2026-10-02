@@ -20,6 +20,7 @@ export BURROW_BOOTSTRAP_ADMIN_PASSWORD=Initial-admin-password-2026
 bun run --cwd web build
 go build -tags embedweb -o "$BURROW_E2E_TMP/burrow" ./cmd/burrow
 go build -o "$BURROW_E2E_TMP/web-client" ./examples/web-client
+export BURROW_E2E_BINARY="$BURROW_E2E_TMP/burrow"
 export BURROW_E2E_WEB_BINARY="$BURROW_E2E_TMP/web-client"
 "$BURROW_E2E_TMP/burrow" migrate
 "$BURROW_E2E_TMP/burrow" seed

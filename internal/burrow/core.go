@@ -89,7 +89,7 @@ func (s *Store) Migrate() error {
 		if err := tx.First(&v, 1).Error; err != nil {
 			return err
 		}
-		migrations := []string{initialMigration, pkceCompatibilityMigration, customRolesMigration, removeUpstreamMigration}
+		migrations := []string{initialMigration, pkceCompatibilityMigration, customRolesMigration, removeUpstreamMigration, mandatoryMFAMigration}
 		if v.Version > len(migrations) {
 			return errors.New("database schema is newer than binary")
 		}
@@ -123,7 +123,7 @@ func (s *Store) Health(ctx context.Context) error {
 	if err := s.DB.WithContext(ctx).First(&v, 1).Error; err != nil {
 		return err
 	}
-	if v.Version != 4 || v.Checksum != migrationChecksum(4) {
+	if v.Version != 5 || v.Checksum != migrationChecksum(5) {
 		return errors.New("migration required")
 	}
 	return nil
@@ -246,7 +246,7 @@ func (s *Store) Cleanup(ctx context.Context) {
 			return
 		case <-ticker.C:
 			now := time.Now()
-			for _, m := range []any{&Session{}, &AuthTransaction{}, &TokenRecord{}} {
+			for _, m := range []any{&Session{}, &AuthTransaction{}, &TokenRecord{}, &LoginTransaction{}} {
 				s.DB.Where("expires_at < ?", now).Delete(m)
 			}
 			s.DB.Where("created_at < ?", now.Add(-s.Config.EventRetention)).Delete(&Event{})
@@ -283,6 +283,9 @@ func checkPasswordLoginMigration(tx *gorm.DB) error {
 	return nil
 }
 
+//go:embed migrations/005_mandatory_mfa.sql
+var mandatoryMFAMigration string
+
 func migrationChecksum(version int) string {
 	if version == 1 {
 		return hash(initialMigration)
@@ -293,7 +296,10 @@ func migrationChecksum(version int) string {
 	if version == 3 {
 		return hash(initialMigration + pkceCompatibilityMigration + customRolesMigration)
 	}
-	return hash(initialMigration + pkceCompatibilityMigration + customRolesMigration + removeUpstreamMigration)
+	if version == 4 {
+		return hash(initialMigration + pkceCompatibilityMigration + customRolesMigration + removeUpstreamMigration)
+	}
+	return hash(initialMigration + pkceCompatibilityMigration + customRolesMigration + removeUpstreamMigration + mandatoryMFAMigration)
 }
 
 func (c *Config) defaults() {

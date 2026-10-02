@@ -34,7 +34,7 @@ python3 examples/local-sso/harbor/deploy.py ps
 | Nightingale | http://n9e.yakir.top     | `root` / `root.2020`                       |
 | Harbor      | http://harbor.yakir.top  | `admin` / `Harbor-development-admin-2026`  |
 
-首次登录 Burrow 后按提示修改临时密码。Seed 管理员邮箱为 `admin@example.test`，已有数据库中的账号不会被 seed 重置。
+首次登录 Burrow 后按提示修改临时密码，再绑定 TOTP 认证器并验证动态码；全部完成后才建立可用于应用 SSO 的正式会话。Seed 管理员邮箱为 `admin@example.test`，已有数据库中的账号不会被 seed 重置。
 
 此示例使用 HTTP 和公开开发凭据，浏览器入口仅绑定 `127.0.0.1:80`。Burrow、Grafana、Nightingale 和 Harbor HTTP 服务不直接发布宿主机端口；Harbor 保留官方日志组件的 `127.0.0.1:1514` syslog 端口。Docker 网络中四个域名都指向 Nginx，下游访问 OIDC 端点时也使用对外 issuer `http://sso.yakir.top`。
 
@@ -46,7 +46,7 @@ python3 examples/local-sso/harbor/deploy.py ps
 | ---------------------------------- | ---------------------------------------------- |
 | 名称                               | Grafana                                        |
 | 客户端类型                         | Web                                            |
-| 启用、本地密码登录                 | 开启                                           |
+| 启用                               | 开启                                           |
 | 应用登录 URL                       | `http://grafana.yakir.top/login/generic_oauth` |
 | Redirect URIs                      | `http://grafana.yakir.top/login/generic_oauth` |
 | 允许不使用 PKCE                    | 关闭                                           |
@@ -66,7 +66,7 @@ docker compose -f examples/local-sso/docker-compose.yml restart grafana
 
 1. 先使用 Burrow 管理员完成临时密码修改和应用创建，确认 Grafana 与 Burrow 的应用凭据一致。
 2. 创建有姓名和非空邮箱的普通 Burrow 用户，用户名与 Grafana 本地 `admin` 区分；创建普通角色并授予对应应用的登录权限，再分配给用户。新用户默认无角色，需要通过普通角色授予应用权限。
-3. 打开 Grafana，点击 “Burrow” 登录按钮，使用上述普通用户完成授权并返回 Grafana。
+3. 打开 Grafana，点击 “Burrow” 登录按钮，使用上述普通用户完成密码与 MFA 验证、授权并返回 Grafana。
 4. 使用隐私窗口验证普通用户能够登录，未获应用权限的用户被拒绝。
 5. 在 Burrow 应用门户点击 Grafana，验证再次登录复用 Burrow 会话。
 
@@ -120,7 +120,7 @@ Email = "email"
 | 客户端类型                         | Server-side Web                 |
 | Client ID                          | `nightingale-example`           |
 | Client Secret                      | `nightingale-example-secret`    |
-| 启用、本地密码登录                 | 开启                            |
+| 启用                               | 开启                            |
 | 应用登录 URL                       | `http://n9e.yakir.top/`         |
 | Redirect URIs                      | `http://n9e.yakir.top/callback` |
 | 允许不使用 PKCE                    | **开启**                        |
@@ -192,7 +192,7 @@ Email = "email"
 | 客户端类型                         | Server-side Web                                         |
 | Client ID                          | `harbor-example`                                        |
 | Client Secret                      | `harbor-example-secret`                                 |
-| 启用、本地密码登录                 | 开启                                                    |
+| 启用                               | 开启                                                    |
 | 应用登录 URL                       | `http://harbor.yakir.top/c/oidc/login?redirect_url=%2F` |
 | Redirect URIs                      | `http://harbor.yakir.top/c/oidc/callback`               |
 | 允许不使用 PKCE                    | **关闭**                                                |

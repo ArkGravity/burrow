@@ -6,6 +6,13 @@ export interface User {
   language: string;
   theme: string;
   mustChangePassword: boolean;
+  mfaEnabled: boolean;
+}
+export interface LoginState {
+  step: "password" | "bind" | "verify" | "complete";
+  expiresAt: string;
+  requestId: string;
+  redirect?: string;
 }
 export interface Session {
   user: User;

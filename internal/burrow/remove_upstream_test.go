@@ -22,7 +22,7 @@ func testLegacyStore(t *testing.T, driver string, version int) *Store {
 		if err := tx.Migrator().CreateTable(&SchemaVersion{}); err != nil {
 			return err
 		}
-		for _, migration := range []string{initialMigration, pkceCompatibilityMigration, customRolesMigration}[:version] {
+		for _, migration := range []string{initialMigration, pkceCompatibilityMigration, customRolesMigration, removeUpstreamMigration}[:version] {
 			for _, statement := range strings.Split(migration, ";") {
 				if strings.TrimSpace(statement) != "" {
 					if err := tx.Exec(statement).Error; err != nil {
@@ -113,7 +113,7 @@ func TestRemoveUpstreamMigration(t *testing.T) {
 				}
 				for _, method := range []string{"password", "oidc", "unknown"} {
 					session := Session{ID: method, UserID: u.ID, CredentialHash: hash(method), Method: method, AuthTime: time.Now(), ExpiresAt: time.Now().Add(time.Hour)}
-					if err := s.DB.Create(&session).Error; err != nil {
+					if err := s.DB.Omit("MFAAt", "AuthVersion").Create(&session).Error; err != nil {
 						t.Fatal(err)
 					}
 					if err := s.DB.Create(&TokenRecord{ID: method, UserID: u.ID, ClientID: a.ID, SessionID: method, ExpiresAt: session.ExpiresAt}).Error; err != nil {
@@ -176,6 +176,7 @@ func TestRemoveUpstreamMigration(t *testing.T) {
 					}
 				}
 				var current User
+				u.MFALastStep = -1
 				if err := s.DB.First(&current, "id = ?", u.ID).Error; err != nil || !reflect.DeepEqual(current, u) {
 					t.Fatal("user data changed during migration")
 				}
@@ -218,11 +219,7 @@ func TestRemoveUpstreamMigration(t *testing.T) {
 					if err := s.DB.Model(&AuthTransaction{}).Where("id = ?", method).Count(&auths).Error; err != nil {
 						t.Fatal(err)
 					}
-					if method == "password" {
-						if session.Revoked || token.Revoked || auths != 1 {
-							t.Fatal("password session/token/code invalidated")
-						}
-					} else if !session.Revoked || !token.Revoked || auths != 0 {
+					if !session.Revoked || !token.Revoked || auths != 0 {
 						t.Fatal("non-password authentication remains usable")
 					}
 				}
@@ -290,12 +287,13 @@ func TestPasswordOnlyAuthentication(t *testing.T) {
 			if err := b.DB.First(&recovered, "id = ?", u.ID).Error; err != nil || !recovered.MustChangePassword {
 				t.Fatal("password reset did not require password change")
 			}
-			if w := guest.request("PUT", "/api/v1/me", map[string]string{"name": "bypass"}, true); w.Code != 403 {
+			if w := guest.request("PUT", "/api/v1/me", map[string]string{"name": "bypass"}, true); w.Code != 401 {
 				t.Fatal("legacy user bypassed forced password change")
 			}
-			if w := guest.request("POST", "/api/v1/me/password", map[string]string{"currentPassword": testPassword, "password": testPassword + "-changed"}, true); w.Code != 200 {
+			if w := guest.request("POST", "/api/v1/auth/login/password", map[string]string{"password": testPassword + "-changed"}, true); w.Code != 200 {
 				t.Fatal("legacy user cannot complete password change")
 			}
+			guest.verifyMFA(t)
 			if w := guest.request("GET", "/api/v1/me/apps", nil, false); w.Code != 200 {
 				t.Fatal("legacy user cannot access portal after recovery")
 			}

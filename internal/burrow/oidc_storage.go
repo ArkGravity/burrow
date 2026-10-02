@@ -68,7 +68,7 @@ type authRequest struct {
 
 func (a *authRequest) GetID() string          { return a.ID }
 func (a *authRequest) GetACR() string         { return "" }
-func (a *authRequest) GetAMR() []string       { return []string{a.Method} }
+func (a *authRequest) GetAMR() []string       { return []string{"pwd", "otp"} }
 func (a *authRequest) GetAudience() []string  { return []string{a.Request.ClientID} }
 func (a *authRequest) GetAuthTime() time.Time { return a.AuthTime }
 func (a *authRequest) GetClientID() string    { return a.Request.ClientID }
@@ -195,7 +195,7 @@ func (b *Server) authorized(tx *gorm.DB, a AuthTransaction) (User, Session, erro
 	if !admin && !contains(p, "app:"+app.ID+":login") {
 		return u, session, oidc.ErrAccessDenied()
 	}
-	if session.Method != "password" {
+	if session.Method != "password" || !validMFASession(u, session) {
 		return u, session, oidc.ErrLoginRequired()
 	}
 	return u, session, nil
@@ -220,6 +220,11 @@ func (s oidcStore) CreateAccessToken(ctx context.Context, request op.TokenReques
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	err := s.DB.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if s.Config.DBDriver == "postgres" {
+			if err := tx.Exec("SELECT pg_advisory_xact_lock(734285622)").Error; err != nil {
+				return err
+			}
+		}
 		if _, _, e := s.authorized(tx, a.AuthTransaction); e != nil {
 			return oidc.ErrInvalidGrant()
 		}

@@ -10,6 +10,10 @@ type User struct {
 	Enabled            bool       `json:"enabled"`
 	PasswordHash       string     `json:"-"`
 	MustChangePassword bool       `json:"mustChangePassword"`
+	MFAEnabled         bool       `json:"mfaEnabled"`
+	MFACipher          string     `json:"-"`
+	MFALastStep        int64      `json:"-"`
+	AuthVersion        int64      `json:"-"`
 	Language           string     `json:"language"`
 	Theme              string     `json:"theme"`
 	RoleIDs            []string   `gorm:"-" json:"roleIds"`
@@ -83,6 +87,8 @@ type Session struct {
 	CredentialHash string `gorm:"uniqueIndex"`
 	Method         string
 	AuthTime       time.Time
+	MFAAt          time.Time
+	AuthVersion    int64
 	ExpiresAt      time.Time `gorm:"index"`
 	Revoked        bool
 }
@@ -99,6 +105,22 @@ type AuthTransaction struct {
 	Consumed      bool
 	AuthTime      time.Time
 	Method        string
+}
+
+// LoginTransaction grants access only to the remaining authentication steps.
+// Neither its credential nor its encrypted pending secret is a shared session.
+type LoginTransaction struct {
+	ID             string `gorm:"primaryKey"`
+	CredentialHash string `gorm:"uniqueIndex"`
+	BrowserHash    string
+	UserID         string `gorm:"index"`
+	AuthVersion    int64
+	RequestID      string
+	PendingCipher  string
+	MFAVerified    bool
+	MFAAt          time.Time
+	Attempts       int
+	ExpiresAt      time.Time `gorm:"index"`
 }
 type TokenRecord struct {
 	ID        string `gorm:"primaryKey"`

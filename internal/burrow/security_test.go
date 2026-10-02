@@ -82,6 +82,49 @@ func (c *browser) login(t *testing.T, username, password string) {
 	if w.Code != 200 {
 		t.Fatalf("login %d: %s", w.Code, w.Body.String())
 	}
+	var result struct{ Step string }
+	json.Unmarshal(w.Body.Bytes(), &result)
+	if result.Step == "verify" || result.Step == "bind" {
+		c.verifyMFA(t)
+	}
+}
+func (c *browser) verifyMFA(t *testing.T) {
+	t.Helper()
+	u, l, err := c.b.loginStateDB(c.b.DB, cookieRequest(c))
+	if err != nil {
+		t.Fatal(err)
+	}
+	secret := ""
+	last := int64(-1)
+	if loginStep(u, l) == "bind" {
+		w := c.request("POST", "/api/v1/auth/login/bind", map[string]string{}, true)
+		var result struct{ Secret string }
+		json.Unmarshal(w.Body.Bytes(), &result)
+		if w.Code != 200 || result.Secret == "" {
+			t.Fatal(w.Body.String())
+		}
+		secret = result.Secret
+	} else {
+		secret, err = c.b.unseal(u.MFACipher)
+		if err != nil {
+			t.Fatal(err)
+		}
+		last = u.MFALastStep
+	}
+	// Advance the injected verifier clock, avoiding real-time sleeps in unrelated tests.
+	now := c.b.mfaTime()
+	if now.Unix()/30 <= last {
+		now = time.Unix((last+1)*30, 0)
+	}
+	c.b.mfaTime = func() time.Time { return now }
+	code, err := otpCode(secret, now.Unix()/30)
+	if err != nil {
+		t.Fatal(err)
+	}
+	w := c.request("POST", "/api/v1/auth/login/verify", map[string]string{"code": code}, true)
+	if w.Code != 200 {
+		t.Fatal(w.Body.String())
+	}
 }
 func openTestStore(t *testing.T, driver string) *Store {
 	t.Helper()
@@ -152,10 +195,11 @@ func testServer(t *testing.T, driver string) (*Server, *browser, User) {
 	}
 	c := newBrowser(b)
 	c.login(t, "admin", testPassword)
-	w := c.request("POST", "/api/v1/me/password", map[string]string{"currentPassword": testPassword, "password": testPassword + "-changed"}, true)
+	w := c.request("POST", "/api/v1/auth/login/password", map[string]string{"password": testPassword + "-changed"}, true)
 	if w.Code != 200 {
 		t.Fatal(w.Body.String())
 	}
+	c.verifyMFA(t)
 	var u User
 	s.DB.First(&u, "username = ?", "admin")
 	return b, c, u
@@ -199,17 +243,18 @@ func TestCSRFAndForcedPassword(t *testing.T) {
 	}
 	c.login(t, "admin", testPassword)
 	w = c.request("GET", "/api/v1/users", nil, false)
-	if w.Code != 403 {
+	if w.Code != 401 {
 		t.Fatal("forced-password user obtained admin access")
 	}
 	w = c.request("PUT", "/api/v1/me", map[string]string{"theme": "dark"}, true)
-	if w.Code != 403 {
+	if w.Code != 401 {
 		t.Fatal("forced-password user changed profile")
 	}
-	w = c.request("POST", "/api/v1/me/password", map[string]string{"currentPassword": testPassword, "password": testPassword + "changed"}, true)
+	w = c.request("POST", "/api/v1/auth/login/password", map[string]string{"password": testPassword + "changed"}, true)
 	if w.Code != 200 {
 		t.Fatal(w.Body.String())
 	}
+	c.verifyMFA(t)
 	w = c.request("GET", "/api/v1/users", nil, false)
 	if w.Code != 200 {
 		t.Fatal(w.Body.String())
@@ -362,6 +407,10 @@ func TestOIDCCodePKCEAndRevocation(t *testing.T) {
 					}
 					var claims map[string]any
 					json.Unmarshal(payload, &claims)
+					amr, ok := claims["amr"].([]any)
+					if !ok || len(amr) != 2 || amr[0] != "pwd" || amr[1] != "otp" || claims["auth_time"] == nil {
+						t.Fatal("ID Token does not describe completed password and OTP authentication")
+					}
 					if claims["iss"] != b.Config.Issuer || claims["nonce"] != "nonce-check" {
 						t.Fatalf("claims %s", payload)
 					}

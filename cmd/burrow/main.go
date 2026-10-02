@@ -29,12 +29,17 @@ func run() error {
 		command, args = args[0], args[1:]
 	}
 	switch command {
-	case "serve", "migrate", "seed", "keys-rotate", "healthcheck":
+	case "serve", "migrate", "seed", "keys-rotate", "healthcheck", "mfa-reset":
 	default:
 		return fmt.Errorf("unknown command %q", command)
 	}
 	fs := flag.NewFlagSet(command, flag.ContinueOnError)
 	configPath := fs.String("config", "", "configuration file (default: configs/config.yaml or embedded defaults)")
+	var username, reason *string
+	if command == "mfa-reset" {
+		username = fs.String("username", "", "account to reset")
+		reason = fs.String("reason", "", "required audit reason")
+	}
 	if err := fs.Parse(args); err != nil {
 		if err == flag.ErrHelp {
 			return nil
@@ -101,6 +106,15 @@ func run() error {
 			return e
 		}
 		slog.Info("seed completed; existing administrator credentials preserved")
+		return nil
+	case "mfa-reset":
+		if e = store.Health(context.Background()); e != nil {
+			return e
+		}
+		if e = store.ResetMFA(*username, *reason); e != nil {
+			return e
+		}
+		slog.Info("MFA reset completed; next password login requires enrollment")
 		return nil
 	case "keys-rotate":
 		if e = store.Health(context.Background()); e != nil {
