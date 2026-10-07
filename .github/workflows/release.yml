@@ -36,7 +36,16 @@ jobs:
 
   prepare:
     needs: [validate]
-    runs-on: ubuntu-latest
+    name: Prepare and test release (${{ matrix.arch }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubuntu-24.04
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
     timeout-minutes: 40
     services:
       postgres:
@@ -54,6 +63,7 @@ jobs:
     env:
       RELEASE_VERSION: ${{ needs.validate.outputs.version }}
       RELEASE_COMMIT: ${{ needs.validate.outputs.commit }}
+      RELEASE_ARCH: ${{ matrix.arch }}
       BURROW_TEST_POSTGRES_DSN: host=127.0.0.1 port=5432 user=burrow password=ci-test-only dbname=burrow_release_test sslmode=disable
     steps:
       - uses: actions/checkout@v4
@@ -68,9 +78,11 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: .
-          platforms: linux/amd64
+          platforms: linux/${{ matrix.arch }}
           load: true
-          tags: burrow:release
+          provenance: false
+          sbom: false
+          tags: burrow:release-${{ matrix.arch }}
           build-args: |
             VERSION=${{ needs.validate.outputs.version }}
             COMMIT=${{ needs.validate.outputs.commit }}
@@ -81,22 +93,22 @@ jobs:
             org.opencontainers.image.revision=${{ needs.validate.outputs.commit }}
             org.opencontainers.image.created=${{ needs.validate.outputs.build_time }}
             org.opencontainers.image.licenses=MIT
-          cache-from: type=gha,scope=burrow-image
-          cache-to: type=gha,scope=burrow-image,mode=max
+          cache-from: type=gha,scope=burrow-image-${{ matrix.arch }}
+          cache-to: type=gha,scope=burrow-image-${{ matrix.arch }},mode=max
       - name: Extract and package the exact image binary
         run: |
           mkdir -p bin release-assets
-          container=$(docker create burrow:release)
+          container=$(docker create "burrow:release-$RELEASE_ARCH")
           trap 'docker rm "$container" >/dev/null' EXIT
           docker cp "$container:/usr/local/bin/burrow" bin/burrow
           chmod +x bin/burrow
           bin/burrow version | tee bin/version.txt
           grep -Fx "burrow $RELEASE_VERSION" bin/version.txt
           grep -Fx "commit: $RELEASE_COMMIT" bin/version.txt
-          bash scripts/release/package.sh "$RELEASE_VERSION" "$PWD/bin/burrow" "$PWD/release-assets"
+          bash scripts/release/package.sh "$RELEASE_VERSION" "$RELEASE_ARCH" "$PWD/bin/burrow" "$PWD/release-assets"
           cd release-assets
-          sha256sum --check SHA256SUMS
-          tar -xzf "burrow_${RELEASE_VERSION}_linux_amd64.tar.gz" -C "$RUNNER_TEMP"
+          sha256sum --check "SHA256SUMS-$RELEASE_ARCH"
+          tar -xzf "burrow_${RELEASE_VERSION}_linux_${RELEASE_ARCH}.tar.gz" -C "$RUNNER_TEMP"
       - name: Install browser dependencies
         run: |
           make web-install
@@ -104,28 +116,28 @@ jobs:
           bun x playwright install --with-deps chromium
       - name: Test the packaged binary with SQLite, MFA and OIDC browsers
         env:
-          BURROW_E2E_BINARY: ${{ runner.temp }}/burrow_${{ needs.validate.outputs.version }}_linux_amd64/burrow
+          BURROW_E2E_BINARY: ${{ runner.temp }}/burrow_${{ needs.validate.outputs.version }}_linux_${{ matrix.arch }}/burrow
         run: make test-e2e
       - name: Test production container startup with PostgreSQL
-        run: bash scripts/release/smoke-image.sh burrow:release
+        run: bash scripts/release/smoke-image.sh "burrow:release-$RELEASE_ARCH"
       - name: Save tested image for publication without rebuilding
-        run: docker save --output bin/release-image.tar burrow:release
+        run: docker save --output "bin/image-$RELEASE_ARCH.tar" "burrow:release-$RELEASE_ARCH"
       - uses: actions/upload-artifact@v4
         with:
-          name: release-assets
+          name: release-assets-${{ matrix.arch }}
           path: release-assets/
           if-no-files-found: error
           retention-days: 7
       - uses: actions/upload-artifact@v4
         with:
-          name: release-image
-          path: bin/release-image.tar
+          name: release-image-${{ matrix.arch }}
+          path: bin/image-${{ matrix.arch }}.tar
           if-no-files-found: error
           retention-days: 1
       - uses: actions/upload-artifact@v4
         if: failure()
         with:
-          name: release-browser-results
+          name: release-browser-results-${{ matrix.arch }}
           path: web/test-results/
 
   draft:
@@ -150,11 +162,15 @@ jobs:
         run: bash scripts/release/validate.sh
       - uses: actions/download-artifact@v4
         with:
-          name: release-assets
-          path: release-assets
+          pattern: release-assets-*
+          merge-multiple: true
+          path: release-inputs
+      - name: Verify both architecture archives and assemble shared attachments
+        run: bash scripts/release/assemble.sh "$RELEASE_VERSION" "$PWD/release-inputs" "$PWD/release-assets"
       - uses: actions/download-artifact@v4
         with:
-          name: release-image
+          pattern: release-image-*
+          merge-multiple: true
           path: bin
       - name: Check registry configuration
         env:
@@ -173,25 +189,12 @@ jobs:
         with:
           username: ${{ env.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
-      - name: Push the tested image and require public access
+      - name: Push tested images and require matching public multi-platform indexes
         run: |
-          docker load --input bin/release-image.tar
-          ghcr="ghcr.io/${GITHUB_REPOSITORY,,}:$RELEASE_VERSION"
-          hub="docker.io/$DOCKERHUB_NAMESPACE/burrow:$RELEASE_VERSION"
-          for image in "$ghcr" "$hub"; do
-            docker tag burrow:release "$image"
-            docker push "$image"
-          done
-          anonymous_config=$(mktemp -d)
-          trap 'rm -rf "$anonymous_config"' EXIT
-          for image in "$ghcr" "$hub"; do
-            DOCKER_CONFIG="$anonymous_config" docker manifest inspect "$image" >/dev/null
-            docker buildx imagetools inspect "$image" --format '{{json .Manifest}}' | jq -er --arg image "$image" '.digest | select(test("^sha256:[0-9a-f]{64}$")) | "\($image) \(.)"' >>release-assets/IMAGES.txt
-          done
-          test "$(awk '{print $2}' release-assets/IMAGES.txt | sort -u | wc -l)" -eq 1
+          bash scripts/release/publish-images.sh "$RELEASE_VERSION" release "$PWD/bin" "$PWD/release-assets/IMAGES.txt"
           cd release-assets
-          sha256sum --check SHA256SUMS
           sha256sum IMAGES.txt >>SHA256SUMS
+          sha256sum --check SHA256SUMS
       - name: Create or update a draft with all attachments
         run: |
           releases=$(gh api --paginate "repos/$GITHUB_REPOSITORY/releases?per_page=100")

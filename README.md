@@ -19,7 +19,7 @@ The UI supports English and Simplified Chinese, with light, dark and system them
 PostgreSQL is used in production; SQLite is available for local development.
 
 Burrow uses the [MIT license](LICENSE). [Version `v0.1.0`](https://github.com/ArkGravity/burrow/releases/tag/v0.1.0) is available;
-see [release notes](docs/releases/v0.1.0.md), [installation instructions](docs/releases/INSTALL.md)
+see [release notes](docs/releases/v0.1.0.md), [installation instructions](https://github.com/ArkGravity/burrow/releases/download/v0.1.0/INSTALL.md)
 and the [changelog](CHANGELOG.md) for Linux amd64 binaries, container images and
 deployment packages.
 
@@ -32,7 +32,7 @@ deployment packages.
 - **Simple deployment:** one binary with an embedded UI, or Docker Compose with PostgreSQL; no Redis or queue.
 - **Localized UI:** English and Simplified Chinese, with light, dark and system themes.
 
-For a first installation, use the [v0.1.0 installation guide](docs/releases/INSTALL.md).
+For a first installation, use the [v0.1.0 installation guide](https://github.com/ArkGravity/burrow/releases/download/v0.1.0/INSTALL.md).
 For downstream integrations, see the [Web and SPA examples](examples/README.md)
 and [Grafana, Nightingale and Harbor setup](examples/local-sso/README.md).
 
@@ -182,7 +182,9 @@ isolate deployments. Set `BURROW_IMAGE` to a fixed image tag or digest, such as
 `ghcr.io/arkgravity/burrow:main-<short-sha>` or
 `docker.io/logic3579/burrow:main-<short-sha>` (the default Docker Hub namespace).
 Version releases use `vX.Y.Z` tags in both registries and include a standalone
-Compose deployment archive. Use the [release installation guide](docs/releases/INSTALL.md)
+Compose deployment archive. Current workflows build Linux amd64 and arm64
+images under the same tag and provide separate binaries for both architectures;
+the published `v0.1.0` remains amd64-only. Use the [release installation guide](docs/releases/INSTALL.md)
 for deployment without a source checkout; development images remain available.
 For an external PostgreSQL database, omit the local profile:
 
@@ -262,15 +264,16 @@ protocol verification and historical design documents.
 
 [CI](.github/workflows/ci.yml) runs Go race tests against SQLite and PostgreSQL 17,
 static analysis, frontend checks and builds, Chromium flows, Compose configuration
-validation and container builds in parallel. Successful `main` runs then publish
-the image to GHCR and Docker Hub. See [CI setup](docs/development/ci.md) for
+validation and container builds in parallel. Backend, browser and image checks
+run natively on Linux amd64 and arm64. Successful `main` runs then publish
+multi-platform images to GHCR and Docker Hub without rebuilding. See [CI setup](docs/development/ci.md) for
 triggers, image tags and registry credentials.
 Local verification scope and limitations are recorded in the
 [verification report](docs/testing/oidc-conformance.md). Engineering interoperability
 tests are not an OpenID Foundation certification.
 
 Version tags additionally run the [release workflow](.github/workflows/release.yml)
-to prepare tested binaries, deployment archives, checksums and versioned images
+to prepare tested amd64/arm64 binaries, a shared deployment archive, checksums and versioned multi-platform images
 in a Release draft. See [release preparation and publication](docs/development/releases.md).
 
 MFA setup is mandatory at first login and after an Administrator resets MFA.

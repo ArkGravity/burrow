@@ -1,14 +1,16 @@
 # Install Burrow
 
-The v0.1.0 release supports Linux amd64. Download attachments from
+This release supports Linux amd64 and arm64. Download attachments from
 [GitHub Releases](https://github.com/ArkGravity/burrow/releases). Verify the
 downloaded files with `sha256sum --check SHA256SUMS` in the download directory.
 Download every listed attachment before checking the complete checksum file.
-`IMAGES.txt` lists the versioned container images and their registry digests.
+`IMAGES.txt` lists the multi-platform version tags and architecture-specific
+image tags with their registry digests. The historical v0.1.0 release supports
+amd64 only; follow its attached installation guide when installing that version.
 
 ## Containers (recommended)
 
-Extract `burrow_v0.1.0_deploy.tar.gz` and enter the extracted directory. It
+Extract `burrow_@VERSION@_deploy.tar.gz` and enter the extracted directory. It
 contains the canonical root Compose file, an environment example and the MIT
 license. Docker Engine and Compose v2 are required; Go and Bun are not required.
 
@@ -26,10 +28,11 @@ Edit `.env` before starting. Use the generated values for `BURROW_MASTER_KEY`,
 Keep `.env` private. Place Burrow behind your TLS reverse proxy; its host port
 binds to loopback by default. Production uses PostgreSQL.
 
-The deployment example selects `ghcr.io/arkgravity/burrow:v0.1.0`. You can instead
-set `BURROW_IMAGE=docker.io/logic3579/burrow:v0.1.0`, or pin the matching digest
+The deployment example selects `ghcr.io/arkgravity/burrow:@VERSION@`. You can instead
+set `BURROW_IMAGE=docker.io/logic3579/burrow:@VERSION@`, or pin the matching index digest
 from `IMAGES.txt`. Change the tag when installing a later release. The archive
 does not contain a Dockerfile; use the published image without building locally.
+Docker selects amd64 or arm64 automatically from the same tag or index digest.
 
 ```bash
 docker compose --profile local-db config --quiet
@@ -55,10 +58,11 @@ do not use `down --volumes` when keeping data.
 
 ## Standalone binary
 
-Extract `burrow_v0.1.0_linux_amd64.tar.gz` and enter its directory. The binary
-embeds the frontend and configuration defaults. It requires Linux amd64 with
-glibc 2.36 or newer (for example Debian 12); Alpine/musl, older glibc and other
-architectures are not supported by this asset. It is built with CGO using the
+Choose `burrow_@VERSION@_linux_amd64.tar.gz` for x86-64 or
+`burrow_@VERSION@_linux_arm64.tar.gz` for AArch64, then enter its extracted
+directory. Each binary embeds the frontend and configuration defaults. It
+requires Linux on the matching architecture with glibc 2.36 or newer (for example
+Debian 12); Alpine/musl and older glibc are not supported. It is built with CGO using the
 same Debian bookworm build as the container. Go and Bun are not needed to run it.
 
 ```bash
@@ -95,12 +99,12 @@ satisfy the password-only migration requirements. Applications keep their own
 sessions. Database migration cannot be undone merely by selecting an older
 image; restore a compatible database backup and its original configuration/key.
 
-See the [configuration reference](https://github.com/ArkGravity/burrow/blob/v0.1.0/docs/development/configuration.md)
-and [backup, upgrade and MFA recovery guide](https://github.com/ArkGravity/burrow/blob/v0.1.0/docs/operations/recovery.md).
+See the [configuration reference](https://github.com/ArkGravity/burrow/blob/@VERSION@/docs/development/configuration.md)
+and [backup, upgrade and MFA recovery guide](https://github.com/ArkGravity/burrow/blob/@VERSION@/docs/operations/recovery.md).
 
 ## License and verification scope
 
-Burrow is released under the included MIT license. v0.1.0 is an early release;
+Burrow is released under the included MIT license. These are early releases;
 future releases may require configuration, API or database migrations. Automated
 OIDC interoperability checks and historical manual acceptance do not constitute
 OpenID Foundation certification or validation of your production deployment.
