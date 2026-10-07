@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v0.1.1 (release preparation)
 
 - Native Linux amd64 and arm64 CI tests and image builds, with matching
   multi-platform images in GHCR and Docker Hub.

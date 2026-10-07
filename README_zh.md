@@ -14,7 +14,7 @@ Burrow 帮助你集中管理账户、登录和应用访问权限。用户使用 
 PostgreSQL，开发和测试支持 SQLite，无需 Redis 或消息队列。
 
 - [源码仓库](https://github.com/ArkGravity/burrow) · [v0.1.0 正式版](https://github.com/ArkGravity/burrow/releases/tag/v0.1.0)
-- [安装指南](docs/releases/INSTALL.md) · [版本说明（含中文）](docs/releases/v0.1.0.md) · [更新记录](CHANGELOG.md)
+- [安装指南](https://github.com/ArkGravity/burrow/releases/download/v0.1.0/INSTALL.md) · [版本说明（含中文）](docs/releases/v0.1.0.md) · [更新记录](CHANGELOG.md)
 - [文档索引](docs/README.md) · [配置参考](docs/development/configuration.md) · [OIDC 接入示例](examples/README.md)
 
 ## 主要功能
@@ -181,7 +181,10 @@ make test-e2e         # Chromium、MFA 和独立 Web / SPA OIDC 流程
 | `docs/`            | 配置、运维、验证、发布和设计记录                    |
 
 详细技术与运维文档目前以英文为主，可从[文档索引](docs/README.md)进入。
-CI 检查 SQLite / PostgreSQL、前端、浏览器流程和容器构建，通过后发布镜像。
+CI 在 Linux amd64 和 arm64 原生 runner 上检查 SQLite / PostgreSQL、浏览器流程和容器构建，
+并执行前端与静态检查；全部通过后向 GHCR 和 Docker Hub 发布双架构镜像。
+Release 分别测试两种架构的二进制与容器，发布独立二进制包和共享 Compose 部署包。
+现有 v0.1.0 仍仅提供 amd64；v0.1.1 发布准备已增加 arm64，远端验证待完成。
 查看 [CI 与镜像发布](docs/development/ci.md)、[MFA 与恢复](docs/development/mfa-proposal.md)
 和[发布流程](docs/development/releases.md)。
 
