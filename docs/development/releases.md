@@ -31,9 +31,10 @@ verify pull requests and publish development images from `main`.
    readiness, healthcheck and embedded UI. Both jobs must succeed.
 5. The draft job verifies both downloaded archive checksums, creates the shared
    deployment archive and renders the installation guide. It downloads the tested
-   images without rebuilding, validates architecture/revision, and pushes
-   `vX.Y.Z-amd64` and `vX.Y.Z-arm64` tags to GHCR and Docker Hub. It assembles
-   `vX.Y.Z` multi-platform indexes from immutable digests, requiring exactly the
+   images without rebuilding, validates architecture/revision, and uses pinned
+   `crane` v0.22.1 to upload both saved images by digest to GHCR and Docker Hub.
+   It creates only the `vX.Y.Z` tag by assembling multi-platform indexes from
+   those immutable digests, requiring exactly the
    two tested platforms, anonymous index access and matching platform/index
    digests across registries. It attaches the six files listed below to a draft
    Release. Review these results and publish the draft:
@@ -52,12 +53,15 @@ links; these are separate from the tested binary and deployment attachments.
 - `burrow_vX.Y.Z_linux_arm64.tar.gz`: tested AArch64 binary with embedded frontend.
 - `burrow_vX.Y.Z_deploy.tar.gz`: one shared Compose deployment archive.
 - `INSTALL.md`: rendered instructions for the selected version and both architectures.
-- `IMAGES.txt`: two multi-platform tag/index digests, followed by four
-  architecture-specific tag/manifest digests, one pair per registry.
+- `IMAGES.txt`: two multi-platform tag/index digests, followed by four untagged
+  platform references (`repository@sha256:...`) and their manifest digests,
+  ordered amd64 then arm64 for each registry.
 - `SHA256SUMS`: checksums for the other five attachments.
 
 The version tag and index digest select the runtime architecture automatically.
-Architecture-specific tags/digests can be used when a fixed platform is required.
+Platform digests can be used when a fixed platform is required. New publications
+do not create architecture-suffixed tags. Historical published tags and Release
+attachments remain unchanged.
 The saved images have no provenance or SBOM attestations; the assembled indexes
 contain exactly `linux/amd64` and `linux/arm64`. Cache scopes, saved image artifacts,
 binary artifacts, archive checksum files and failed browser reports include the
@@ -76,7 +80,7 @@ setting, not a workflow field.
 Non-tag refs, invalid/unstable version tags, commits outside `main`, missing or
 failed exact-commit CI, API errors and already published Releases are rejected.
 A failed build/test produces no publication. Registry/network failures can leave
-architecture tags or one multi-platform index published without a complete draft: fix the failure and
+untagged platform manifests or one multi-platform index published without a complete draft: fix the failure and
 rerun failed jobs to reuse the tested image. Intermediate Actions image artifacts
 are retained for one day and release assets for seven days. If artifacts have
 expired, rerun the whole workflow while the version is still unpublished.

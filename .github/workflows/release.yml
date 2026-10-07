@@ -172,6 +172,12 @@ jobs:
           pattern: release-image-*
           merge-multiple: true
           path: bin
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: false
+      - name: Install digest image publisher
+        run: go install github.com/google/go-containerregistry/cmd/crane@v0.22.1
       - name: Check registry configuration
         env:
           DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}

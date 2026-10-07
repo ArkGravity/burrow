@@ -71,15 +71,16 @@ and normalizes it to lowercase. The CI workflow does not publish `latest`, relea
 tags or images from pull requests and other branches. The separate
 [release workflow](releases.md) prepares fixed version tags and Release drafts.
 Docker selects `linux/amd64` or `linux/arm64` automatically from the same tag.
-The publishing script first pushes architecture-specific `main-<short-sha>-amd64`
-and `main-<short-sha>-arm64` tags, then assembles indexes from immutable digests.
+The publishing job installs pinned `crane` v0.22.1 to upload the tested image
+archives by digest, then assembles indexes from those immutable digests. Only
+`main-<short-sha>` receives a tag; no architecture-suffixed tags are created.
 It validates saved-image architecture and revision, pushed image configuration,
 exact index membership, anonymous index access and matching platform/index digests
 across both registries. Provenance and SBOM attestations are disabled for the
 saved single-platform images; the final index contains only the two runtime platforms.
 
 Saved image artifacts are retained for one day. Publishing failures may leave
-architecture tags or an index in only one registry; retry the publishing job while
+untagged platform manifests or an index in only one registry; retry the publishing job while
 artifacts exist. If they have expired, rerun the complete workflow.
 
 Set `BURROW_IMAGE` in the deployment's untracked `.env.prod` to the desired tag

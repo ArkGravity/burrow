@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- Publish only a unified multi-platform image tag per commit or version in GHCR
+  and Docker Hub. Upload tested amd64 and arm64 images by digest without creating
+  architecture-suffixed tags.
+
 ## v0.1.1 (2026-10-07)
 
 Published as [Burrow v0.1.1](https://github.com/ArkGravity/burrow/releases/tag/v0.1.1).

@@ -1,4 +1,4 @@
-"""Exercise publication failures with a fake Docker CLI; no registry writes."""
+"""Exercise publication failures with fake Docker/crane CLIs; no registry writes."""
 
 import json
 import os
@@ -17,7 +17,7 @@ from pathlib import Path
 args = sys.argv[1:]
 scenario = os.environ.get("SCENARIO", "")
 with open(os.environ["DOCKER_LOG"], "a") as log:
-    log.write(json.dumps({"args": args, "anonymous": bool(os.environ.get("DOCKER_CONFIG"))}) + "\n")
+    log.write(json.dumps({"tool": "docker", "args": args, "anonymous": bool(os.environ.get("DOCKER_CONFIG"))}) + "\n")
 def config(arch):
     return "sha256:" + ("a" if arch == "amd64" else "b") * 64
 def digest(arch, hub=False):
@@ -33,15 +33,14 @@ elif args[:2] == ["image", "inspect"]:
     commit = "wrong" if scenario == "wrong-commit" else os.environ["GITHUB_SHA"]
     print(json.dumps({"Id": config(arch), "Os": "linux", "Architecture": actual_arch,
         "Config": {"Labels": {"org.opencontainers.image.revision": commit}}}))
-elif args[:1] in [["tag"], ["push"]]:
-    pass
 elif args[:3] == ["buildx", "imagetools", "create"]:
     assert len(args) == 7
     assert all("@sha256:" in value for value in args[-2:])
 elif args[:3] == ["buildx", "imagetools", "inspect"]:
     image = args[3]
     hub = image.startswith("docker.io/")
-    arch = next((a for a in ["amd64", "arm64"] if image.endswith("-" + a)), None)
+    arch = next((a for a, value in [("amd64", "c"), ("arm64", "d")]
+        if image.endswith("@sha256:" + value * 64)), None)
     if scenario == "anonymous-denied" and os.environ.get("DOCKER_CONFIG"):
         sys.exit(1)
     if args[4] == "--raw":
@@ -68,6 +67,33 @@ else:
     raise AssertionError("Unexpected Docker command: " + repr(args))
 '''
 
+MOCK_CRANE = r'''
+import json, os, sys
+from pathlib import Path
+args = sys.argv[1:]
+scenario = os.environ.get("SCENARIO", "")
+with open(os.environ["DOCKER_LOG"], "a") as log:
+    log.write(json.dumps({"tool": "crane", "args": args, "anonymous": False}) + "\n")
+if args[:2] == ["digest", "--tarball"]:
+    assert len(args) == 3
+    archive = Path(args[2])
+    assert archive.is_file()
+    arch = archive.stem.removeprefix("image-")
+    assert arch in ["amd64", "arm64"]
+    value = "sha256:" + ("c" if arch == "amd64" else "d") * 64
+    print("invalid" if scenario == "invalid-local-digest" else value)
+elif args[:1] == ["push"]:
+    assert len(args) == 3
+    assert Path(args[1]).is_file()
+    arch = Path(args[1]).stem.removeprefix("image-")
+    assert args[2].endswith("@sha256:" + ("c" if arch == "amd64" else "d") * 64)
+    if scenario == "push-failed":
+        sys.exit(1)
+    print(args[2])
+else:
+    raise AssertionError("Unexpected crane command: " + repr(args))
+'''
+
 
 class PublishImageTests(unittest.TestCase):
     def setUp(self):
@@ -78,9 +104,10 @@ class PublishImageTests(unittest.TestCase):
         self.images.mkdir()
         for arch in ["amd64", "arm64"]:
             (self.images / f"image-{arch}.tar").write_bytes(b"saved image fixture")
-        docker = self.directory / "docker"
-        docker.write_text(f"#!{sys.executable}\n" + MOCK_DOCKER)
-        docker.chmod(0o755)
+        for name, mock in [("docker", MOCK_DOCKER), ("crane", MOCK_CRANE)]:
+            executable = self.directory / name
+            executable.write_text(f"#!{sys.executable}\n" + mock)
+            executable.chmod(0o755)
         self.log = self.directory / "docker.log"
         self.output = self.directory / "IMAGES.txt"
         self.env = {**os.environ, "PATH": str(self.directory) + os.pathsep + os.environ["PATH"],
@@ -107,12 +134,20 @@ class PublishImageTests(unittest.TestCase):
         self.assertEqual(lines[0], ["ghcr.io/arkgravity/burrow:v0.2.0", "sha256:" + "e" * 64])
         self.assertEqual(lines[1], ["docker.io/logic3579/burrow:v0.2.0", lines[0][1]])
         self.assertEqual([line[1] for line in lines[2:]], ["sha256:" + x * 64 for x in ["c", "d", "c", "d"]])
+        for reference, digest in lines[2:]:
+            self.assertTrue(reference.endswith("@" + digest))
         commands = self.commands()
         self.assertEqual(sum(c["args"][0] == "push" for c in commands), 4)
+        self.assertTrue(all(c["tool"] == "crane" and "@sha256:" in c["args"][2]
+                            for c in commands if c["args"][0] == "push"))
+        self.assertFalse(any(c["args"][0] == "tag" for c in commands))
         self.assertEqual(sum(c["args"][:3] == ["buildx", "imagetools", "create"] for c in commands), 2)
+        self.assertEqual([c["args"][4] for c in commands if c["args"][:3] == ["buildx", "imagetools", "create"]],
+                         ["ghcr.io/arkgravity/burrow:v0.2.0", "docker.io/logic3579/burrow:v0.2.0"])
         self.assertEqual(sum(c["anonymous"] for c in commands), 4)
         first_push = next(i for i, c in enumerate(commands) if c["args"][0] == "push")
         self.assertEqual(sum(c["args"][:2] == ["image", "inspect"] for c in commands[:first_push]), 2)
+        self.assertEqual(sum(c["args"][:2] == ["digest", "--tarball"] for c in commands[:first_push]), 2)
 
     def test_main_image_publication(self):
         self.publish(tag="main-1111111", kind="ci")
@@ -125,13 +160,13 @@ class PublishImageTests(unittest.TestCase):
         self.assertEqual(self.commands(), [])
 
     def test_wrong_local_architecture_or_commit_prevents_any_registry_write(self):
-        for scenario in ["wrong-architecture", "wrong-commit"]:
+        for scenario in ["wrong-architecture", "wrong-commit", "invalid-local-digest"]:
             with self.subTest(scenario=scenario):
                 self.publish(scenario, success=False)
                 self.assertFalse(any(c["args"][0] == "push" for c in self.commands()))
 
     def test_remote_validation_failures(self):
-        for scenario in ["wrong-config", "missing-platform", "extra-platform", "wrong-os",
+        for scenario in ["push-failed", "wrong-config", "missing-platform", "extra-platform", "wrong-os",
                          "wrong-platform-digest", "platform-digest-mismatch",
                          "index-digest-mismatch", "anonymous-denied"]:
             with self.subTest(scenario=scenario):
