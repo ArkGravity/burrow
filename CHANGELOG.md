@@ -1,13 +1,15 @@
 # Changelog
 
-## v0.1.1 (release preparation)
+## v0.1.1 (2026-10-07)
+
+Published as [Burrow v0.1.1](https://github.com/ArkGravity/burrow/releases/tag/v0.1.1).
 
 - Native Linux amd64 and arm64 CI tests and image builds, with matching
   multi-platform images in GHCR and Docker Hub.
 - Release preparation tests both architecture binaries and containers, reuses
   saved images for publication, and provides separate binary archives plus a
-  shared deployment archive, image digests and checksums. Remote verification
-  of this workflow is pending; published v0.1.0 remains amd64-only.
+  shared deployment archive, image digests and checksums. Both native CI and
+  release preparation jobs passed; published v0.1.0 remains amd64-only.
 
 ## v0.1.0 (2026-10-02)
 

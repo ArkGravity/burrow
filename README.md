@@ -18,9 +18,9 @@ implemented, with a focused OIDC scope and a single-instance deployment.
 The UI supports English and Simplified Chinese, with light, dark and system themes.
 PostgreSQL is used in production; SQLite is available for local development.
 
-Burrow uses the [MIT license](LICENSE). [Version `v0.1.0`](https://github.com/ArkGravity/burrow/releases/tag/v0.1.0) is available;
-see [release notes](docs/releases/v0.1.0.md), [installation instructions](https://github.com/ArkGravity/burrow/releases/download/v0.1.0/INSTALL.md)
-and the [changelog](CHANGELOG.md) for Linux amd64 binaries, container images and
+Burrow uses the [MIT license](LICENSE). [Version `v0.1.1`](https://github.com/ArkGravity/burrow/releases/tag/v0.1.1) is available;
+see [release notes](docs/releases/v0.1.1.md), [installation instructions](https://github.com/ArkGravity/burrow/releases/download/v0.1.1/INSTALL.md)
+and the [changelog](CHANGELOG.md) for Linux amd64/arm64 binaries, container images and
 deployment packages.
 
 ## Features
@@ -32,7 +32,7 @@ deployment packages.
 - **Simple deployment:** one binary with an embedded UI, or Docker Compose with PostgreSQL; no Redis or queue.
 - **Localized UI:** English and Simplified Chinese, with light, dark and system themes.
 
-For a first installation, use the [v0.1.0 installation guide](https://github.com/ArkGravity/burrow/releases/download/v0.1.0/INSTALL.md).
+For a first installation, use the [v0.1.1 installation guide](https://github.com/ArkGravity/burrow/releases/download/v0.1.1/INSTALL.md).
 For downstream integrations, see the [Web and SPA examples](examples/README.md)
 and [Grafana, Nightingale and Harbor setup](examples/local-sso/README.md).
 

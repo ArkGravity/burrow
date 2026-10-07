@@ -1,5 +1,16 @@
 # 协议与回归验证记录
 
+## 2026-10-07：v0.1.1 双架构正式发布
+
+- 按用户要求提交并推送双架构实现 `abac1be` 和版本准备 `b2fe059`，在精确提交 `b2fe05991d284504b90075f333142cd813300935` 的[完整 main CI](https://github.com/ArkGravity/burrow/actions/runs/37595876423) 成功后创建并推送 annotated tag `v0.1.1`。该 tag 后续保持不变，文档状态同步使用独立提交。
+- CI 的原生 amd64/arm64 SQLite/PostgreSQL race tests、Chromium/MFA/OIDC 回归、镜像构建与静默 Compose 校验均通过；前端检查/构建、Go 静态分析和 29 项发布脚本回归也通过。保存的镜像成功发布到 GHCR 和 Docker Hub，双架构索引及各架构 digest 一致。
+- [v0.1.1 Release workflow](https://github.com/ArkGravity/burrow/actions/runs/37596734846) 的 validate、两个原生 prepare 和 draft 全部通过。两个架构均从各自镜像提取真实二进制，验证版本/commit、打包后运行 SQLite/MFA/OIDC 浏览器回归，并对同一容器执行 PostgreSQL 生产模式迁移、重复 seed、启动、readiness、healthcheck 与内嵌前端检查。发布复用保存的镜像，不重新构建。
+- 六个 Release 附件全部下载复核，GitHub API 提供的附件 digest 和本地 SHA256 一致；`SHA256SUMS` 覆盖其余五个附件。两个二进制归档的 ELF 架构、执行位、许可证、配置与版本化安装说明正确；Go 元信息确认 Go 1.27.1、Linux、对应 GOARCH、CGO 和 embedweb。部署包保留原封不动的根 Compose，镜像行固定为 `ghcr.io/arkgravity/burrow:v0.1.1`。
+- 下载程序 SHA256：amd64 为 `b241dfc94abf6b93669a3176e3ee489808d57864e6276b779cc66d822c23a185`，arm64 为 `5798a7f77d0e7560a1710307bfa5d2efd7e1ff99dbe3458aaed30db03408852b`。本机只检查 ELF 和构建元信息，没有执行这些 Linux 程序；它们的实际运行测试由上述原生 Release jobs 完成。
+- 两个仓库的 `v0.1.1` manifest 均复核为恰好包含 `linux/amd64` 和 `linux/arm64`，共同 index digest 为 `sha256:23604067892397b5a75469f8c6caf7da8987d98cb2778acfd2f032a02fe0ccb6`；amd64 manifest 为 `sha256:db118831c5de30a07a593cac13f55b715f40b7514880e884c6ea5a0a28857f3c`，arm64 manifest 为 `sha256:edd1721e9b66aba49978a94656951264765f771c22e2333d196c0873b18c49d6`。Workflow 的匿名索引访问检查通过。
+- [Burrow v0.1.1](https://github.com/ArkGravity/burrow/releases/tag/v0.1.1) 于 `2026-10-07T09:02:21Z` 正式发布。GitHub API 确认 `draft=false`、`prerelease=false`、Latest 为 `v0.1.1`，六个附件均为 uploaded。认证、权限和 schema v5 未改变，旧 v0.1.0 发布产物未替换。
+- 上述结果是本轮远端工程验证与附件复核，不代表生产部署、重新验收 Grafana/Nightingale/Harbor 或官方 OIDC 认证。此前用户报告的三应用与 MFA 人工验收仍为独立历史检查点。
+
 ## 2026-10-02：v0.1.0 正式发布
 
 - 用户明确要求正式发布后，[Burrow v0.1.0](https://github.com/ArkGravity/burrow/releases/tag/v0.1.0) 于 `2026-10-02T14:53:59Z` 发布。GitHub API 确认 `draft=false`、`prerelease=false`，Latest Release 为 `v0.1.0`，五个附件均为 uploaded。版本 tag 指向 `523ff526043b7bc430c88baf53a396f2861595f9`；后续文档状态同步不移动该 tag。
