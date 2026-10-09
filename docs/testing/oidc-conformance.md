@@ -1,5 +1,17 @@
 # 协议与回归验证记录
 
+## 2026-10-09：登录品牌、单击退出与全局 MFA 开关
+
+- 在新分支 `fix/login-logout-mfa-config` 移除登录品牌后的 `/`，将站内退出改为带 CSRF 的直接 POST 并返回登录页。应用发起的 OIDC 退出仍使用确认及精确重定向校验。
+- 新增 `security.mfa_enabled` / `BURROW_MFA_ENABLED`；按用户后续要求默认关闭，需要时手动设为 `true`，配置修改后重启。关闭时所有账户跳过绑定和验证，临时密码仍需改密，已有绑定保留；管理员重置免除动态码，权限与审计原因仍必需。重新开启后拒绝密码登录产生的会话、其换码和在线 Token 使用。OIDC `amr` 按实际会话返回 `pwd` 或 `pwd`/`otp`。schema v5 与迁移 001–005 未修改。
+- 独立临时 PostgreSQL 17 与 SQLite 的完整 `make test-db lint` 通过，包含 race 检查；最终补充的应用授权撤销与 `users:write` 无法重置 MFA 的边界用例另行在双库通过 race 测试。新增覆盖配置默认值及优先级、已绑定/未绑定用户、临时密码、策略切换、实际 ID Token 声明、换码/UserInfo 复查、CSRF、退出后的旧 Cookie 与审计失败回滚。
+- `make web-check` 类型检查及两条单测通过；`make test-e2e` 五条 Chromium 流程全部通过，其中新增独立临时服务验证关闭 MFA、改密、个人资料提示、单击退出，以及服务重启后重新开启/关闭策略。其余四条显式开启 MFA、Web/SPA SSO/RP 退出、Web PKCE 例外及 MFA 重置/CLI 恢复回归继续通过。运行器完成前端及嵌入前端测试二进制构建。
+- 静默根 Compose 校验、Prettier、本地文档链接及 diff 检查通过。本轮仅本地工程验证，未部署生产、构建 Burrow 容器镜像、检查远端 CI 或重新执行三应用人工验收；历史用户验收记录保持独立。改动尚未提交或推送，已发布的 v0.1.1 产物保持原状。
+- 后续按用户要求将 YAML、环境示例和 Compose 的 MFA 默认值改为 `false`，README 明确说明需手动开启。上述回归结果来自默认值调整前；本次默认值调整按用户要求不重新运行回归测试。
+- 随后按用户要求实际构建当前分支的 `burrow:local-sso` 镜像，重新启动独立 `examples/local-sso` 的 Burrow、Grafana、Nightingale、Nginx。四个服务均健康，卷初始化/迁移/seed 成功，三个本地域名 HTTP 入口返回 200。使用用户既有的域名解析，未修改本机 hosts；Harbor 未启动，根生产 Compose 未参与。示例的 `BURROW_MFA_ENABLED` 默认 `false`，可手动改为 `true` 重建 Burrow 进行验收。用户明确将自行浏览器验收、截图并替换现有截图；当前未执行新的 SSO 人工验收，也未替换截图，已有截图的生产来源记录保持原状。
+- 用户随后报告已成功创建 Grafana/Nightingale 应用、角色和组，创建用户因密码策略错误而失败；这是用户操作反馈，尚未代表两个应用的完整 SSO 验收。前端增加 `PASSWORD_POLICY` 的中英文错误映射、创建用户密码要求与字段校验，并统一重置/修改密码校验，按后端 UTF-8 12–256 字节范围处理。`make web-check` 与密码上下限/中文长度及错误映射检查通过，修复镜像重新构建成功；未运行完整浏览器回归、创建测试用户或替换截图。
+- 修复后用户报告浏览器人工验收通过：`admin` 成功添加 application、role、group、user，新用户 `logic` 成功登录并查看应用门户。用户提供五张英文深色主题截图，普通用户门户展示获授权的 Grafana/Nightingale；中英文 README 与截图来源说明已更新，之前两张生产实例截图已移除。此项为用户报告的本地 Burrow 功能验收，不扩展为此次下游应用 SSO、生产部署或官方认证结论。此次文档更新仅检查格式、本地链接和 diff，未重复产品回归。
+
 ## 2026-10-07：v0.1.1 双架构正式发布
 
 - 按用户要求提交并推送双架构实现 `abac1be` 和版本准备 `b2fe059`，在精确提交 `b2fe05991d284504b90075f333142cd813300935` 的[完整 main CI](https://github.com/ArkGravity/burrow/actions/runs/37595876423) 成功后创建并推送 annotated tag `v0.1.1`。该 tag 后续保持不变，文档状态同步使用独立提交。

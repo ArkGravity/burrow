@@ -21,6 +21,9 @@ database:
   dsn: burrow.db
 
 security:
+  # MFA is disabled by default. Set true to require TOTP for every account.
+  # Disabling preserves existing bindings.
+  mfa_enabled: false
   # Public development example only; production rejects this value.
   # Generate a deployment key with: openssl rand -base64 32
   master_key: "MDEyMzQ1Njc4OTAxMjM0NTY3ODkwMTIzNDU2Nzg5MDE="

@@ -9,6 +9,7 @@ cleanup() {
 }
 trap cleanup EXIT INT TERM
 export BURROW_ENV=dev
+export BURROW_MFA_ENABLED=true
 export BURROW_MASTER_KEY=$(openssl rand -base64 32)
 export BURROW_DB_DRIVER=sqlite
 export BURROW_DB_DSN="$BURROW_E2E_TMP/burrow.db"

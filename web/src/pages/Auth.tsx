@@ -16,6 +16,7 @@ import { api, write, APIError, resetCSRF, type LoginState } from "../lib/api";
 import { useI18n, errorKey } from "../lib/i18n";
 import { useSession } from "../lib/session";
 import { safeRedirect } from "../lib/access";
+import { passwordRule } from "../lib/password";
 import { Preferences } from "../components/Preferences";
 import { BrandMark } from "../components/BrandMark";
 
@@ -27,7 +28,6 @@ export function AuthFrame({ children }: { children: React.ReactNode }) {
         <a href="/" className="brand light">
           <BrandMark />
           burrow
-          <span className="brand-dot">/</span>
         </a>
         <div className="auth-story-body">
           <div className="eyebrow">
@@ -210,7 +210,7 @@ export function PasswordForm({ required = false }: { required?: boolean }) {
         label={t("newPassword")}
         rules={[
           { required: true, message: t("required") },
-          { min: 12, message: t("passwordHint") },
+          passwordRule(t("passwordHint")),
         ]}
       >
         <Input.Password autoComplete="new-password" />

@@ -44,9 +44,10 @@ curl --fail http://127.0.0.1:8080/readyz
 ```
 
 Compose starts migration, seed and the server in order. Sign in as `admin` with
-your configured temporary password, change it and bind a TOTP authenticator.
-Re-running seed preserves existing accounts and credentials. There is no MFA
-skip option. For an external PostgreSQL database, update the DSN with its
+your configured temporary password and change it. MFA is disabled by default;
+to require TOTP for all accounts, manually set `BURROW_MFA_ENABLED=true` in `.env`
+and recreate the application container. Users then bind or verify their authenticator
+at login. Re-running seed preserves existing accounts and credentials. For an external PostgreSQL database, update the DSN with its
 host/credentials/TLS settings and omit `--profile local-db` from these commands.
 
 ```bash
@@ -88,6 +89,10 @@ server under your service manager and put it behind your TLS reverse proxy.
 ## Upgrades and recovery
 
 Back up the database, original master key and configuration before upgrading.
+Versions v0.1.0 and v0.1.1 required MFA; v0.1.2 defaults to disabling it. To keep
+requiring MFA, explicitly set `BURROW_MFA_ENABLED=true` in the service environment
+(Compose: `.env`), or `security.mfa_enabled: true` in the selected YAML, before
+starting the upgraded server. Existing authenticator bindings are preserved.
 Stop the old server, select the new image/binary, run migration and seed, then
 start the new server. Never generate a replacement master key for an existing
 database. Keep the old backup until administrator and downstream OIDC login
@@ -95,7 +100,7 @@ have been verified.
 
 Upgrading older development versions to schema v5 invalidates old Burrow
 sessions/tokens and unfinished authorizations. Users sign in again with their
-existing passwords and bind TOTP. Older Provider-based databases must first
+existing passwords and, when MFA is enabled, bind TOTP. Older Provider-based databases must first
 satisfy the password-only migration requirements. Applications keep their own
 sessions. Database migration cannot be undone merely by selecting an older
 image; restore a compatible database backup and its original configuration/key.

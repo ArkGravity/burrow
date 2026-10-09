@@ -56,8 +56,9 @@ func newMFASecret() (string, error) {
 	}
 	return base32.StdEncoding.WithPadding(base32.NoPadding).EncodeToString(key), nil
 }
-func validMFASession(u User, s Session) bool {
-	return u.MFAEnabled && u.MFACipher != "" && !u.MustChangePassword && !s.MFAAt.IsZero() && s.AuthVersion == u.AuthVersion
+func (b *Server) validMFASession(u User, s Session) bool {
+	return !u.MustChangePassword && s.AuthVersion == u.AuthVersion &&
+		(!b.Config.MFAEnabled || (u.MFAEnabled && u.MFACipher != "" && !s.MFAAt.IsZero()))
 }
 
 // Share the administrative lock with password, account and MFA mutations.
@@ -74,14 +75,14 @@ func (s *Store) authenticationTx(f func(*gorm.DB) error) error {
 		return f(tx)
 	})
 }
-func loginStep(u User, l LoginTransaction) string {
-	if u.MFAEnabled && !l.MFAVerified {
+func (b *Server) loginStep(u User, l LoginTransaction) string {
+	if b.Config.MFAEnabled && u.MFAEnabled && !l.MFAVerified {
 		return "verify"
 	}
 	if u.MustChangePassword {
 		return "password"
 	}
-	if !u.MFAEnabled {
+	if b.Config.MFAEnabled && !u.MFAEnabled {
 		return "bind"
 	}
 	return "complete"
@@ -100,28 +101,34 @@ func (b *Server) loginStateDB(tx *gorm.DB, r *http.Request) (User, LoginTransact
 	if err = tx.Where("id = ? AND enabled = ? AND auth_version = ? AND password_hash <> ?", l.UserID, true, l.AuthVersion, "").First(&u).Error; err != nil {
 		return u, l, errors.New("invalid_transaction")
 	}
+	if err := b.validateLoginRequest(tx, u, l); err != nil {
+		return u, l, err
+	}
+	return u, l, nil
+}
+func (b *Server) validateLoginRequest(tx *gorm.DB, u User, l LoginTransaction) error {
 	if l.RequestID != "" {
 		var a AuthTransaction
 		if tx.Where("id = ? AND browser_hash = ? AND expires_at > ? AND consumed = ?", l.RequestID, l.BrowserHash, time.Now(), false).First(&a).Error != nil {
-			return u, l, errors.New("invalid_transaction")
+			return errors.New("invalid_transaction")
 		}
 		var app Application
 		if tx.Where("id = ? AND enabled = ?", a.ClientID, true).First(&app).Error != nil {
-			return u, l, errors.New("invalid_transaction")
+			return errors.New("invalid_transaction")
 		}
 		// Recheck the application's current permission before completing authentication.
 		p, admin, err := permissions(tx, u)
 		if err != nil {
-			return u, l, err
+			return err
 		}
 		if !admin && !contains(p, "app:"+app.ID+":login") {
-			return u, l, errors.New("forbidden")
+			return errors.New("forbidden")
 		}
 	}
-	return u, l, nil
+	return nil
 }
-func loginResult(u User, l LoginTransaction) map[string]any {
-	return map[string]any{"step": loginStep(u, l), "expiresAt": l.ExpiresAt, "requestId": l.RequestID}
+func (b *Server) loginResult(u User, l LoginTransaction) map[string]any {
+	return map[string]any{"step": b.loginStep(u, l), "expiresAt": l.ExpiresAt, "requestId": l.RequestID}
 }
 func (b *Server) login(w http.ResponseWriter, r *http.Request) {
 	if b.limited(r, "login") {
@@ -155,20 +162,15 @@ func (b *Server) login(w http.ResponseWriter, r *http.Request) {
 	}
 	credential := random(32)
 	l := LoginTransaction{ID: random(18), CredentialHash: hash(credential), BrowserHash: hash(browser.Value), UserID: u.ID, AuthVersion: u.AuthVersion, RequestID: in.RequestID, ExpiresAt: time.Now().Add(restrictedLoginTTL)}
+	var out map[string]any
+	var sessionCredential string
 	err = b.authenticationTx(func(tx *gorm.DB) error {
 		var current User
 		if tx.Where("id = ? AND enabled = ?", u.ID, true).First(&current).Error != nil || current.PasswordHash != u.PasswordHash || current.AuthVersion != u.AuthVersion {
 			return errors.New("invalid_credentials")
 		}
-		if in.RequestID != "" {
-			var a AuthTransaction
-			if tx.Where("id = ? AND browser_hash = ? AND expires_at > ? AND consumed = ?", in.RequestID, l.BrowserHash, time.Now(), false).First(&a).Error != nil {
-				return errors.New("invalid_transaction")
-			}
-			var app Application
-			if tx.Where("id = ? AND enabled = ?", a.ClientID, true).First(&app).Error != nil {
-				return errors.New("invalid_transaction")
-			}
+		if err := b.validateLoginRequest(tx, current, l); err != nil {
+			return err
 		}
 		if c, e := r.Cookie("burrow_login"); e == nil {
 			if err := tx.Where("credential_hash = ?", hash(c.Value)).Delete(&LoginTransaction{}).Error; err != nil {
@@ -181,15 +183,21 @@ func (b *Server) login(w http.ResponseWriter, r *http.Request) {
 				return err
 			}
 		}
-		return tx.Create(&l).Error
+		if err := tx.Create(&l).Error; err != nil {
+			return err
+		}
+		out, sessionCredential, err = b.finishLogin(tx, current, l, r)
+		return err
 	})
 	if err != nil {
 		mutationError(w, r, err)
 		return
 	}
-	b.cookie(w, "burrow_session", "", -1)
-	b.cookie(w, "burrow_login", credential, int(restrictedLoginTTL.Seconds()))
-	write(w, 200, loginResult(u, l))
+	if sessionCredential == "" {
+		b.cookie(w, "burrow_session", "", -1)
+		b.cookie(w, "burrow_login", credential, int(restrictedLoginTTL.Seconds()))
+	}
+	b.loginResponse(w, out, sessionCredential)
 }
 func (b *Server) loginStatus(w http.ResponseWriter, r *http.Request) {
 	u, l, err := b.loginStateDB(b.DB, r)
@@ -197,7 +205,13 @@ func (b *Server) loginStatus(w http.ResponseWriter, r *http.Request) {
 		mutationError(w, r, err)
 		return
 	}
-	write(w, 200, loginResult(u, l))
+	// A policy change may remove the remaining MFA step. Require a fresh
+	// password login rather than returning "complete" without a shared session.
+	if b.loginStep(u, l) == "complete" {
+		fail(w, r, 400, "invalid_transaction")
+		return
+	}
+	write(w, 200, b.loginResult(u, l))
 }
 func (b *Server) loginBind(w http.ResponseWriter, r *http.Request) {
 	var secret string
@@ -206,7 +220,7 @@ func (b *Server) loginBind(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			return err
 		}
-		if loginStep(u, l) != "bind" {
+		if b.loginStep(u, l) != "bind" {
 			return errors.New("invalid_step")
 		}
 		if l.PendingCipher != "" {
@@ -277,7 +291,7 @@ func (b *Server) loginVerify(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			return err
 		}
-		step := loginStep(u, l)
+		step := b.loginStep(u, l)
 		switch step {
 		case "verify":
 			err = b.consumeOTP(tx, u, in.Code)
@@ -333,8 +347,8 @@ func (b *Server) loginVerify(w http.ResponseWriter, r *http.Request) {
 	b.loginResponse(w, out, credential)
 }
 func (b *Server) finishLogin(tx *gorm.DB, u User, l LoginTransaction, r *http.Request) (map[string]any, string, error) {
-	if loginStep(u, l) != "complete" {
-		return loginResult(u, l), "", nil
+	if b.loginStep(u, l) != "complete" {
+		return b.loginResult(u, l), "", nil
 	}
 	credential := random(32)
 	session := Session{ID: random(18), UserID: u.ID, CredentialHash: hash(credential), Method: "password", AuthTime: time.Now(), MFAAt: l.MFAAt, AuthVersion: u.AuthVersion, ExpiresAt: time.Now().Add(b.Config.SessionTTL)}
@@ -366,7 +380,7 @@ func (b *Server) loginPassword(w http.ResponseWriter, r *http.Request) {
 		mutationError(w, r, err)
 		return
 	}
-	if loginStep(current, login) != "password" {
+	if b.loginStep(current, login) != "password" {
 		fail(w, r, 400, "invalid_step")
 		return
 	}
@@ -390,7 +404,7 @@ func (b *Server) loginPassword(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			return err
 		}
-		if loginStep(u, l) != "password" {
+		if b.loginStep(u, l) != "password" {
 			return errors.New("invalid_step")
 		}
 		if err := invalidateAuthentication(tx, u.ID, l.ID, l.RequestID); err != nil {
@@ -492,8 +506,10 @@ func (b *Server) resetMFA(w http.ResponseWriter, r *http.Request) {
 		if !admin {
 			return errors.New("forbidden")
 		}
-		if err := b.consumeOTP(tx, current, in.Code); err != nil {
-			return err
+		if b.Config.MFAEnabled {
+			if err := b.consumeOTP(tx, current, in.Code); err != nil {
+				return err
+			}
 		}
 		var target User
 		if err := tx.First(&target, "id = ?", chi.URLParam(r, "id")).Error; err != nil {

@@ -1,18 +1,24 @@
 # Product screenshots
 
-These PNGs were captured from the maintainer's authenticated Chrome session at
-`https://burrow.yakir.top` on October 2, 2026. They show the deployed Burrow UI
-in English with the system theme resolved to dark mode.
+These JPEGs were captured and supplied by the maintainer on October 9, 2026,
+during manual browser acceptance of the [local SSO example](../../examples/local-sso/README.md)
+at `http://sso.yakir.top`. They show the UI in English and dark mode. The example
+runs the current development branch with MFA disabled by default.
 
-- `overview-dark.png`: overview metrics and the application portal. No applications
-  were assigned in the captured instance.
-- `roles-dark.png`: the existing custom and built-in roles.
+- `user-app-overview.jpg`: the `logic` user's application portal with assigned
+  Grafana and Nightingale (N9E) applications.
+- `create-application.jpg`: the Nightingale Web application creation form.
+- `create-roles.jpg`: the role editing form with Grafana and Nightingale login
+  permissions selected.
+- `create-group.jpg`: the group creation form with a shared role selected.
+- `create-user.jpg`: the `logic` user creation form with role and group assignments.
 
-Capture was limited to the product viewport. Browser toolbars, bookmarks and
-other tabs are excluded. The pages were viewed without changing application,
-account or authorization data. The screenshots contain no passwords, client
-secrets, tokens or authenticator setup codes.
+The images show the product viewport without browser toolbars or bookmarks.
+Passwords and client secrets are masked; no readable tokens or authenticator
+setup codes are visible. The supplied images are used without modification.
 
-The instance requires Cloudflare Access authorization; it is not an anonymous
-public demo. Screenshot capture verifies access to these pages, not the full
-production deployment or its downstream OIDC integrations.
+The maintainer reported successful administrator creation of applications, roles,
+groups and users, followed by successful login and application portal access as
+the new `logic` user. This checkpoint covers those Burrow flows; downstream SSO
+login, production deployment and official OIDC certification were not part of
+this reported acceptance. See the [verification record](../testing/oidc-conformance.md).

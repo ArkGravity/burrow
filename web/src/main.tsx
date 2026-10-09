@@ -29,11 +29,12 @@ import {
   KeyOutlined,
   LogoutOutlined,
 } from "@ant-design/icons";
-import { api, write, type Session } from "./lib/api";
+import { api, write, APIError, resetCSRF, type Session } from "./lib/api";
 import { can } from "./lib/access";
 import {
   I18nContext,
   useI18n,
+  errorKey,
   type Language,
   type TranslationKey,
 } from "./lib/i18n";
@@ -72,6 +73,19 @@ function Shell() {
   const { session } = useSession();
   const { t } = useI18n();
   const location = useLocation();
+  const { message } = AntApp.useApp();
+  const [signingOut, setSigningOut] = useState(false);
+  const signOut = async () => {
+    setSigningOut(true);
+    try {
+      await write("/auth/logout", {});
+      resetCSRF();
+      window.location.assign("/login");
+    } catch (e) {
+      message.error(t(errorKey((e as APIError).code)));
+      setSigningOut(false);
+    }
+  };
   if (!session) return <Navigate to="/login" replace />;
   if (session.user.mustChangePassword)
     return <Navigate to="/change-password" replace />;
@@ -136,7 +150,8 @@ function Shell() {
             type="text"
             aria-label={t("signOut")}
             icon={<LogoutOutlined />}
-            href="/logout"
+            loading={signingOut}
+            onClick={() => void signOut()}
           />
         </div>
       </aside>

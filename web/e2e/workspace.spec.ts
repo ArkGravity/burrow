@@ -61,6 +61,7 @@ test("administrator provisions access and ordinary users see only their portal",
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
   await page.goto("/login");
+  await expect(page.locator(".auth-story .brand")).toHaveText("burrow");
   await expect(page.getByText("Or continue with", { exact: true })).toHaveCount(
     0,
   );
@@ -234,9 +235,9 @@ test("administrator provisions access and ordinary users see only their portal",
     path: "test-results/portal-dark-zh.png",
     fullPage: true,
   });
-  await ordinary.getByRole("link", { name: "退出登录" }).click();
   await ordinary.getByRole("button", { name: "退出登录", exact: true }).click();
   await expect(ordinary).toHaveURL(/login/);
+  expect((await ordinary.request.get("/api/v1/me")).status()).toBe(401);
   expect(errors).toEqual([]);
   await context.close();
 });

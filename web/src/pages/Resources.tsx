@@ -26,6 +26,7 @@ import {
 } from "@ant-design/icons";
 import { api, write, APIError, type Row, type List } from "../lib/api";
 import { can } from "../lib/access";
+import { passwordRule } from "../lib/password";
 import { useSession } from "../lib/session";
 import { useI18n, errorKey, type TranslationKey } from "../lib/i18n";
 import { GroupTags, type GroupSummary } from "../components/GroupTags";
@@ -263,6 +264,13 @@ export function Resources({ resource }: { resource: string }) {
       await load();
       message.success(t("success"));
     } catch (e) {
+      if (
+        resource === "users" &&
+        editing === null &&
+        (e as APIError).code === "PASSWORD_POLICY"
+      ) {
+        form.setFields([{ name: "password", errors: [t("passwordHint")] }]);
+      }
       message.error(t(errorKey((e as APIError).code)));
     } finally {
       setSaving(false);
@@ -550,6 +558,9 @@ export function Resources({ resource }: { resource: string }) {
                     ...(field.key === "email"
                       ? [{ type: "email" as const, message: t("invalidEmail") }]
                       : []),
+                    ...(resource === "users" && field.key === "password"
+                      ? [passwordRule(t("passwordHint"))]
+                      : []),
                   ]}
                   extra={
                     resource === "applications" && field.key === "clientId"
@@ -561,7 +572,9 @@ export function Resources({ resource }: { resource: string }) {
                           ? t("allowWithoutPkceHint")
                           : field.type === "urls"
                             ? t("linesHint")
-                            : undefined
+                            : resource === "users" && field.key === "password"
+                              ? t("passwordHint")
+                              : undefined
                   }
                 >
                   {field.type === "switch" ? (
@@ -634,7 +647,9 @@ export function Resources({ resource }: { resource: string }) {
         <Alert
           type="warning"
           showIcon
-          title={t("mfaResetHint")}
+          title={t(
+            session?.mfaRequired ? "mfaResetHint" : "mfaResetDisabledHint",
+          )}
           className="form-alert"
         />
         <Form
@@ -656,20 +671,22 @@ export function Resources({ resource }: { resource: string }) {
             }
           }}
         >
-          <Form.Item
-            name="code"
-            label={t("mfaCode")}
-            rules={[
-              { required: true, message: t("required") },
-              { pattern: /^[0-9]{6}$/, message: t("mfaCodeHint") },
-            ]}
-          >
-            <Input
-              inputMode="numeric"
-              autoComplete="one-time-code"
-              maxLength={6}
-            />
-          </Form.Item>
+          {session?.mfaRequired && (
+            <Form.Item
+              name="code"
+              label={t("mfaCode")}
+              rules={[
+                { required: true, message: t("required") },
+                { pattern: /^[0-9]{6}$/, message: t("mfaCodeHint") },
+              ]}
+            >
+              <Input
+                inputMode="numeric"
+                autoComplete="one-time-code"
+                maxLength={6}
+              />
+            </Form.Item>
+          )}
           <Form.Item
             name="reason"
             label={t("mfaReason")}
@@ -707,7 +724,7 @@ export function Resources({ resource }: { resource: string }) {
             label={t("newPassword")}
             rules={[
               { required: true, message: t("required") },
-              { min: 12, message: t("passwordHint") },
+              passwordRule(t("passwordHint")),
             ]}
           >
             <Input.Password autoComplete="new-password" />

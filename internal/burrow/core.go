@@ -28,6 +28,7 @@ type Config struct {
 	TrustedProxies                                              []netip.Prefix
 	Env, ListenAddr, Issuer, DBDriver, DBDSN, StaticDir         string
 	MasterKey                                                   [32]byte
+	MFAEnabled                                                  bool
 	SessionTTL, TokenTTL, AuthCodeTTL, LoginTTL, EventRetention time.Duration
 }
 

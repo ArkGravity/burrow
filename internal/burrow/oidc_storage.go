@@ -64,11 +64,17 @@ func (c client) ClockSkew() time.Duration             { return 0 }
 type authRequest struct {
 	AuthTransaction
 	Request oidc.AuthRequest
+	MFAAt   time.Time
 }
 
-func (a *authRequest) GetID() string          { return a.ID }
-func (a *authRequest) GetACR() string         { return "" }
-func (a *authRequest) GetAMR() []string       { return []string{"pwd", "otp"} }
+func (a *authRequest) GetID() string  { return a.ID }
+func (a *authRequest) GetACR() string { return "" }
+func (a *authRequest) GetAMR() []string {
+	if !a.MFAAt.IsZero() {
+		return []string{"pwd", "otp"}
+	}
+	return []string{"pwd"}
+}
 func (a *authRequest) GetAudience() []string  { return []string{a.Request.ClientID} }
 func (a *authRequest) GetAuthTime() time.Time { return a.AuthTime }
 func (a *authRequest) GetClientID() string    { return a.Request.ClientID }
@@ -135,9 +141,7 @@ func (s oidcStore) AuthRequestByID(ctx context.Context, id string) (op.AuthReque
 		return nil, e
 	}
 	if a.UserID != "" {
-		if _, _, e := s.authorized(s.DB, a); e != nil {
-			return nil, e
-		}
+		return s.authenticatedAuth(s.DB, a)
 	}
 	return loadAuth(a)
 }
@@ -146,10 +150,18 @@ func (s oidcStore) AuthRequestByCode(ctx context.Context, code string) (op.AuthR
 	if e := s.DB.WithContext(ctx).Where("code_hash = ? AND code_expires_at > ? AND consumed = ?", hash(code), time.Now(), false).First(&a).Error; e != nil {
 		return nil, e
 	}
-	if _, _, e := s.authorized(s.DB, a); e != nil {
-		return nil, e
+	return s.authenticatedAuth(s.DB, a)
+}
+func (b *Server) authenticatedAuth(tx *gorm.DB, a AuthTransaction) (*authRequest, error) {
+	_, session, err := b.authorized(tx, a)
+	if err != nil {
+		return nil, err
 	}
-	return loadAuth(a)
+	request, err := loadAuth(a)
+	if err == nil {
+		request.MFAAt = session.MFAAt
+	}
+	return request, err
 }
 func (s oidcStore) SaveAuthCode(ctx context.Context, id, code string) error {
 	h := hash(code)
@@ -195,7 +207,7 @@ func (b *Server) authorized(tx *gorm.DB, a AuthTransaction) (User, Session, erro
 	if !admin && !contains(p, "app:"+app.ID+":login") {
 		return u, session, oidc.ErrAccessDenied()
 	}
-	if session.Method != "password" || !validMFASession(u, session) {
+	if session.Method != "password" || !b.validMFASession(u, session) {
 		return u, session, oidc.ErrLoginRequired()
 	}
 	return u, session, nil

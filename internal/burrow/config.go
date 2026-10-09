@@ -11,6 +11,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -32,6 +33,7 @@ type fileConfig struct {
 		DSN    string `yaml:"dsn"`
 	} `yaml:"database"`
 	Security struct {
+		MFAEnabled    bool   `yaml:"mfa_enabled"`
 		MasterKey     string `yaml:"master_key"`
 		MasterKeyFile string `yaml:"master_key_file"`
 	} `yaml:"security"`
@@ -118,9 +120,15 @@ func LoadConfigFile(path string) (Config, error) {
 	if value, ok := os.LookupEnv("BURROW_TRUSTED_PROXIES"); ok {
 		f.Server.TrustedProxies = strings.Split(value, ",")
 	}
+	if value, ok := os.LookupEnv("BURROW_MFA_ENABLED"); ok {
+		f.Security.MFAEnabled, err = strconv.ParseBool(value)
+		if err != nil {
+			return Config{}, errors.New("invalid BURROW_MFA_ENABLED boolean")
+		}
+	}
 	c := Config{Env: f.Env, ListenAddr: f.Server.ListenAddr, Issuer: strings.TrimRight(f.Server.Issuer, "/"), StaticDir: f.Server.StaticDir,
-		Bootstrap: f.Bootstrap,
-		DBDriver:  f.Database.Driver, DBDSN: f.Database.DSN,
+		Bootstrap: f.Bootstrap, MFAEnabled: f.Security.MFAEnabled,
+		DBDriver: f.Database.Driver, DBDSN: f.Database.DSN,
 		SessionTTL: f.Session.TTL, TokenTTL: f.OIDC.TokenTTL, AuthCodeTTL: f.OIDC.AuthCodeTTL, LoginTTL: f.OIDC.LoginTTL, EventRetention: f.Audit.Retention}
 	if c.Env == "development" {
 		c.Env = "dev"

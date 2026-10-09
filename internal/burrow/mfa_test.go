@@ -569,7 +569,7 @@ func TestMFAOIDCFreshAuthentication(t *testing.T) {
 			}
 			var a AuthTransaction
 			b.DB.First(&a, "id = ?", requestID)
-			loaded, err := loadAuth(a)
+			loaded, err := b.authenticatedAuth(b.DB, a)
 			if err != nil || strings.Join(loaded.GetAMR(), ",") != "pwd,otp" || loaded.GetAuthTime().IsZero() {
 				t.Fatal("incorrect AMR/auth_time")
 			}

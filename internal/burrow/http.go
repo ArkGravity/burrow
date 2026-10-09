@@ -232,7 +232,7 @@ func (b *Server) meResult(u User) (map[string]any, error) {
 		p = []string{}
 		administrator = false
 	}
-	return map[string]any{"user": u, "permissions": p, "administrator": administrator}, nil
+	return map[string]any{"user": u, "permissions": p, "administrator": administrator, "mfaRequired": b.Config.MFAEnabled}, nil
 }
 func (b *Server) me(w http.ResponseWriter, r *http.Request) {
 	u, _, ok := b.require(w, r, "")

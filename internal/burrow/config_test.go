@@ -34,7 +34,7 @@ func TestDefaultConfigWithoutEnvironment(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if c.Env != "dev" || c.DBDriver != "sqlite" || c.ListenAddr != ":8080" || c.SessionTTL != 8*time.Hour || c.MasterKey == [32]byte{} {
+	if c.Env != "dev" || c.DBDriver != "sqlite" || c.ListenAddr != ":8080" || c.SessionTTL != 8*time.Hour || c.MasterKey == [32]byte{} || c.MFAEnabled {
 		t.Fatalf("unexpected defaults: env=%s db=%s listen=%s ttl=%s", c.Env, c.DBDriver, c.ListenAddr, c.SessionTTL)
 	}
 	if base64.StdEncoding.EncodeToString(c.MasterKey[:]) != developmentMasterKey {
@@ -63,6 +63,43 @@ func TestDefaultConfigWithoutEnvironment(t *testing.T) {
 	}
 	if !bytes.Equal(key, []byte(base64.StdEncoding.EncodeToString(c.MasterKey[:])+"\n")) {
 		t.Fatal("persisted key mismatch")
+	}
+}
+
+func TestMFAConfigPrecedence(t *testing.T) {
+	isolatedConfig(t)
+	path := "mfa.yaml"
+	if err := os.WriteFile(path, []byte("security:\n  mfa_enabled: true\n"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	c, err := LoadConfigFile(path)
+	if err != nil || !c.MFAEnabled {
+		t.Fatalf("YAML did not enable MFA: %v", err)
+	}
+	t.Setenv("BURROW_MFA_ENABLED", "false")
+	c, err = LoadConfigFile(path)
+	if err != nil || c.MFAEnabled {
+		t.Fatalf("environment did not override YAML: %v", err)
+	}
+	t.Setenv("BURROW_MFA_ENABLED", "true")
+	c, err = LoadConfig()
+	if err != nil || !c.MFAEnabled {
+		t.Fatalf("environment did not enable MFA: %v", err)
+	}
+	for _, invalid := range []string{"", "yes", "disabled", "secret-invalid-value"} {
+		t.Setenv("BURROW_MFA_ENABLED", invalid)
+		if _, err := LoadConfigFile(path); err == nil || err.Error() != "invalid BURROW_MFA_ENABLED boolean" {
+			t.Fatalf("invalid boolean was accepted or exposed: %v", err)
+		}
+	}
+	if err := os.Unsetenv("BURROW_MFA_ENABLED"); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, []byte("security:\n  mfa_enabled: invalid\n"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := LoadConfigFile(path); err == nil {
+		t.Fatal("invalid YAML boolean accepted")
 	}
 }
 

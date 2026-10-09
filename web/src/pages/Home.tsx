@@ -195,12 +195,14 @@ export function ProfilePage() {
         </Card>
         <Card title={t("security")}>
           <Alert
-            type="success"
+            type={session?.mfaRequired ? "success" : "info"}
             showIcon
-            title={t("mfaBound")}
+            title={t(session?.mfaRequired ? "mfaBound" : "mfaDisabled")}
             className="form-alert"
           />
-          <p className="muted">{t("mfaRecoveryHint")}</p>
+          {session?.mfaRequired && (
+            <p className="muted">{t("mfaRecoveryHint")}</p>
+          )}
           <PasswordForm />
         </Card>
       </div>
