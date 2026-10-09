@@ -1,6 +1,8 @@
 # Changelog
 
-## v0.1.3 (release preparation)
+## v0.1.3 (2026-10-09)
+
+Published as [Burrow v0.1.3](https://github.com/ArkGravity/burrow/releases/tag/v0.1.3).
 
 - Reuse successful PR regression on main only when the recorded tested Git tree
   matches exactly. Missing or invalid evidence falls back to full regression.

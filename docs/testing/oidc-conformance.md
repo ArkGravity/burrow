@@ -1,5 +1,13 @@
 # 协议与回归验证记录
 
+## 2026-10-09：v0.1.3 正式发布
+
+- 用户已验收 CI/release 优化及 Users 操作调整，并授权创建 PR、合并和发布。[PR #6](https://github.com/ArkGravity/burrow/pull/6) 包含两个已验收提交及版本准备，经[完整 PR CI](https://github.com/ArkGravity/burrow/actions/runs/37968041395) 全部通过后 squash 合并到 `90050e1b0595ea78fde8ce92eccc0f1a98c1d1be`。原生 amd64/arm64 的 SQLite/PostgreSQL race、浏览器及镜像构建均通过，前端、静态分析、13 项 CI 和 29 项 release 脚本测试成功。
+- [该提交的 main push CI](https://github.com/ArkGravity/burrow/actions/runs/37968992151) 全部成功。日志确认 PR 的测试 tree 与 main 完全一致，因此复用上述完整回归；两个原生镜像仍通过 PostgreSQL 生产启动烟测及双仓库发布，verify 正确接受计划内的回归跳过。随后在该提交创建并推送 annotated tag `v0.1.3`。
+- [Release 工作流](https://github.com/ArkGravity/burrow/actions/runs/37969599898) 的 validate、两个原生 prepare 和 draft 全部成功。两个镜像提取、打包后的实际二进制各自通过五条 SQLite/MFA/OIDC 浏览器回归，容器通过 PostgreSQL migrate、重复 seed、生产启动、readiness、healthcheck 和内嵌 UI 烟测；发布复用测试镜像。
+- 六个附件全部下载复核，与 GitHub API 摘要一致，SHA256SUMS 覆盖另外五个附件。检查两个 ELF 架构、执行权限、版本/提交元数据、CGO/内嵌前端、MIT、默认配置、安装说明及部署包；Compose 与源码逐字节一致，部署环境固定 v0.1.3。公开镜像 manifest 独立匿名验证恰好包含 amd64/arm64，两仓库共同 index digest 为 `sha256:0ada664d88da3088e6fae016aaf39bc18e87425b13236c1af3ff671a0f2a3641`；amd64 为 `sha256:b292341168a1e5c111da3ee035220244d1923864cfd73972418ca4846f35b38a`，arm64 为 `sha256:6f53ea8694ec7970bb26817654ad7c667b130fd6cb395f8fe2aee4a4238bddad`。本机未执行下载的 Linux 二进制，运行验收来自两个原生 Release 任务。
+- [Burrow v0.1.3](https://github.com/ArkGravity/burrow/releases/tag/v0.1.3) 于 `2026-10-09T18:27:15Z` 正式发布；API 确认 `draft=false`、`prerelease=false`、Latest 为 v0.1.3，六附件均 uploaded。schema v5 与 MFA 默认关闭策略保持不变，历史版本、tag 和附件未替换。用户需求验收与自动化结果分别记录；此次没有部署生产或重新验收下游 SSO，不代表官方 OIDC 认证。
+
 ## 2026-10-09：v0.1.2 正式发布
 
 - 用户授权提交全部变更、推送、创建 PR、合并 `main` 并发布 v0.1.2。修复及发布准备提交 `cd9130c` 经[完整 PR CI](https://github.com/ArkGravity/burrow/actions/runs/37957443924) 通过后，[PR #5](https://github.com/ArkGravity/burrow/pull/5) squash 合并到 `bc6b77ea8bbcca7d86bf5775ac8a1c6530d9dfc2`。该提交的[完整 main CI](https://github.com/ArkGravity/burrow/actions/runs/37958376960) 全部成功，包括原生 amd64/arm64 双数据库 race、浏览器、镜像、静默 Compose 校验和双仓库主分支镜像发布。随后在此提交创建并推送 annotated tag `v0.1.2`。
