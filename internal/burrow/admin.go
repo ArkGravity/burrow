@@ -770,27 +770,6 @@ func (b *Server) resetPassword(w http.ResponseWriter, r *http.Request) {
 	}
 	write(w, 200, map[string]bool{"ok": true})
 }
-func (b *Server) revokeSessions(w http.ResponseWriter, r *http.Request) {
-	_, _, ok := b.require(w, r, "users:write")
-	if !ok {
-		return
-	}
-	id := chi.URLParam(r, "id")
-	err := b.authorizationTx(r, "users:write", func(tx *gorm.DB, current User, _ Session) error {
-		if e := guardAdminTarget(tx, current, id); e != nil {
-			return e
-		}
-		if e := exists(tx, &User{}, id); e != nil {
-			return e
-		}
-		return invalidateAuthentication(tx, id, "", "")
-	})
-	if err != nil {
-		mutationError(w, r, err)
-		return
-	}
-	write(w, 200, map[string]bool{"ok": true})
-}
 func (b *Server) resetSecret(w http.ResponseWriter, r *http.Request) {
 	_, _, ok := b.require(w, r, "applications:write")
 	if !ok {

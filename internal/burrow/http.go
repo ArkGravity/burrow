@@ -92,7 +92,6 @@ func NewServer(s *Store, assets ...fs.FS) (*Server, error) {
 		r.Delete("/api/v1/"+resource+"/{id}", func(w http.ResponseWriter, r *http.Request) { b.mutate(w, r, resource) })
 	}
 	r.Put("/api/v1/users/{id}/password", b.resetPassword)
-	r.Post("/api/v1/users/{id}/revoke-sessions", b.revokeSessions)
 	r.Post("/api/v1/applications/{id}/secret", b.resetSecret)
 	r.Get("/.well-known/openid-configuration", b.discovery)
 	r.Options("/.well-known/openid-configuration", b.discovery)

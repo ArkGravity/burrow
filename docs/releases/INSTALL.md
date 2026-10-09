@@ -89,7 +89,7 @@ server under your service manager and put it behind your TLS reverse proxy.
 ## Upgrades and recovery
 
 Back up the database, original master key and configuration before upgrading.
-Versions v0.1.0 and v0.1.1 required MFA; v0.1.2 defaults to disabling it. To keep
+Versions v0.1.0 and v0.1.1 required MFA; v0.1.2 and later default to disabling it. To keep
 requiring MFA, explicitly set `BURROW_MFA_ENABLED=true` in the service environment
 (Compose: `.env`), or `security.mfa_enabled: true` in the selected YAML, before
 starting the upgraded server. Existing authenticator bindings are preserved.

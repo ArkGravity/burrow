@@ -104,26 +104,48 @@ func TestAuditFailureRollsBackMutation(t *testing.T) {
 }
 
 func TestAuditFailureRollsBackSensitiveActions(t *testing.T) {
-	b, c, u := testServer(t, "sqlite")
-	app := testApp(t, b, "web")
-	spa := testApp(t, b, "spa")
-	if w := c.request("POST", "/api/v1/applications/"+spa.ID+"/secret", nil, true); w.Code != 400 {
-		t.Fatalf("SPA secret rotation must be rejected as invalid input: %d", w.Code)
+	for _, driver := range []string{"sqlite", "postgres"} {
+		t.Run(driver, func(t *testing.T) {
+			b, c, u := testServer(t, driver)
+			app := testApp(t, b, "web")
+			spa := testApp(t, b, "spa")
+			if w := c.request("POST", "/api/v1/applications/"+spa.ID+"/secret", nil, true); w.Code != 400 {
+				t.Fatalf("SPA secret rotation must be rejected as invalid input: %d", w.Code)
+			}
+			if e := b.DB.Migrator().DropTable(&Event{}); e != nil {
+				t.Fatal(e)
+			}
+			w := c.request("POST", "/api/v1/applications/"+app.ID+"/secret", nil, true)
+			var current Application
+			if e := b.DB.First(&current, "id = ?", app.ID).Error; e != nil {
+				t.Fatal(e)
+			}
+			if w.Code != 503 || current.SecretHash != app.SecretHash {
+				t.Fatal("secret rotation committed without audit")
+			}
+			w = c.request("PUT", "/api/v1/users/"+u.ID+"/password", map[string]string{"password": "reset-password-2026"}, true)
+			var currentUser User
+			if e := b.DB.First(&currentUser, "id = ?", u.ID).Error; e != nil {
+				t.Fatal(e)
+			}
+			if w.Code != 503 || currentUser.PasswordHash != u.PasswordHash || currentUser.AuthVersion != u.AuthVersion || currentUser.MustChangePassword != u.MustChangePassword || c.request("GET", "/api/v1/me", nil, false).Code != 200 {
+				t.Fatal("password reset or session invalidation committed without audit")
+			}
+		})
 	}
-	if e := b.DB.Migrator().DropTable(&Event{}); e != nil {
-		t.Fatal(e)
-	}
-	w := c.request("POST", "/api/v1/applications/"+app.ID+"/secret", nil, true)
-	var current Application
-	b.DB.First(&current, "id = ?", app.ID)
-	if w.Code == 200 || current.SecretHash != app.SecretHash {
-		t.Fatal("secret rotation committed without audit")
-	}
-	w = c.request("POST", "/api/v1/users/"+u.ID+"/revoke-sessions", nil, true)
-	var revoked int64
-	b.DB.Model(&Session{}).Where("user_id = ? AND revoked = ?", u.ID, true).Count(&revoked)
-	// testServer revokes the temporary-password session during initialization.
-	if w.Code == 200 || c.request("GET", "/api/v1/me", nil, false).Code != 200 {
-		t.Fatalf("session revocation committed without audit (revoked=%d)", revoked)
+}
+
+func TestRemovedUserSessionRevocationEndpoint(t *testing.T) {
+	for _, driver := range []string{"sqlite", "postgres"} {
+		t.Run(driver, func(t *testing.T) {
+			_, c, u := testServer(t, driver)
+			w := c.request("POST", "/api/v1/users/"+u.ID+"/revoke-sessions", nil, true)
+			if w.Code != 404 {
+				t.Fatalf("removed session revocation endpoint returned %d", w.Code)
+			}
+			if c.request("GET", "/api/v1/me", nil, false).Code != 200 {
+				t.Fatal("removed endpoint changed the user's active session")
+			}
+		})
 	}
 }

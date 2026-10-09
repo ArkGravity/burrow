@@ -11,7 +11,7 @@ export BURROW_BOOTSTRAP_ADMIN_PASSWORD
 BURROW_BOOTSTRAP_ADMIN_PASSWORD=$(openssl rand -hex 24)
 export BURROW_ISSUER=https://release-smoke.invalid
 export BURROW_LISTEN_ADDR=127.0.0.1:18081
-container="burrow-release-smoke-${GITHUB_RUN_ID:-$$}-${GITHUB_RUN_ATTEMPT:-1}"
+container="burrow-image-smoke-${GITHUB_RUN_ID:-$$}-${GITHUB_RUN_ATTEMPT:-1}"
 cleanup() { docker rm -f "$container" >/dev/null 2>&1 || true; }
 trap cleanup EXIT
 runtime=(--rm --network host --read-only --tmpfs /tmp --cap-drop ALL --security-opt no-new-privileges:true
@@ -30,4 +30,4 @@ if [[ $ready != true ]]; then docker logs "$container"; exit 1; fi
 curl --fail --silent http://127.0.0.1:18081/healthz >/dev/null
 curl --fail --silent http://127.0.0.1:18081/ | grep -q '/assets/'
 docker exec --env BURROW_HEALTHCHECK_URL=http://127.0.0.1:18081/readyz "$container" burrow healthcheck
-echo 'Release image: production startup, PostgreSQL, readiness and embedded UI passed.'
+echo 'Container image: production startup, PostgreSQL, readiness and embedded UI passed.'

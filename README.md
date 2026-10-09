@@ -285,8 +285,11 @@ protocol verification and historical design documents.
 
 [CI](.github/workflows/ci.yml) runs Go race tests against SQLite and PostgreSQL 17,
 static analysis, frontend checks and builds, Chromium flows, Compose configuration
-validation and container builds in parallel. Backend, browser and image checks
-run natively on Linux amd64 and arm64. Successful `main` runs then publish
+validation and container builds for PRs, `dev` pushes and manual runs. Backend,
+browser and image checks run natively on Linux amd64 and arm64. Main pushes reuse
+successful PR regression only when the recorded tested Git tree matches exactly,
+and fall back to full regression otherwise. Main always builds and smoke-tests
+both production images before publishing
 multi-platform images to GHCR and Docker Hub without rebuilding. See [CI setup](docs/development/ci.md) for
 triggers, image tags and registry credentials.
 Local verification scope and limitations are recorded in the

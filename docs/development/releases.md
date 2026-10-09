@@ -11,9 +11,13 @@ verify pull requests and publish development images from `main`.
    version: the published `v0.1.0` is amd64-only and must not be replaced.
    `docs/releases/INSTALL.md` is a template; packaging replaces `@VERSION@`
    with the selected tag in every archive and the attached installation guide.
-2. Merge release preparation into `main` and wait for its complete push CI to
-   succeed. The workflow checks the exact commit, main ancestry and API results;
-   PR CI or a different commit's green run cannot substitute.
+2. Merge release preparation into `main` through the required `verify` check and
+   wait for its push CI, including image publication, to succeed. Main CI reuses
+   full PR regression only when its recorded tested tree matches main exactly;
+   otherwise it runs full regression. Both paths build and smoke-test both native
+   images before publication. The release gate still requires the exact commit's
+   successful main push run, main ancestry and successful API responses; PR CI
+   alone or a different commit's green run cannot substitute.
 3. Create and push an annotated tag at that tested commit:
 
    ```bash
@@ -29,10 +33,16 @@ verify pull requests and publish development images from `main`.
    browser suite against the extracted archive binary. Each dedicated PostgreSQL
    service also verifies migration, repeated seed, production container startup,
    readiness, healthcheck and embedded UI. Both jobs must succeed.
+   External-binary browser tests use the frontend already embedded in the archive;
+   they do not rebuild Burrow's frontend. Version metadata still requires a release
+   build instead of retagging a `VERSION=dev` main image, while dependency and
+   frontend build layers remain reusable where their inputs match.
 5. The draft job verifies both downloaded archive checksums, creates the shared
    deployment archive and renders the installation guide. It downloads the tested
    images without rebuilding, validates architecture/revision, and uses pinned
    `crane` v0.22.1 to upload both saved images by digest to GHCR and Docker Hub.
+   The publisher reuses the main workflow's OS/architecture/version-keyed crane
+   binary cache, compiling the tool only on a cache miss.
    It creates only the `vX.Y.Z` tag by assembling multi-platform indexes from
    those immutable digests, requiring exactly the
    two tested platforms, anonymous index access and matching platform/index
@@ -82,8 +92,10 @@ failed exact-commit CI, API errors and already published Releases are rejected.
 A failed build/test produces no publication. Registry/network failures can leave
 untagged platform manifests or one multi-platform index published without a complete draft: fix the failure and
 rerun failed jobs to reuse the tested image. Intermediate Actions image artifacts
-are retained for one day and release assets for seven days. If artifacts have
+and release assets are retained for seven days. If artifacts have
 expired, rerun the whole workflow while the version is still unpublished.
+Preparation-job retries replace their own named image and archive artifacts;
+retrying only the draft job continues to reuse the existing tested artifacts.
 
 For a tag pushed before main CI completes, rerun after CI succeeds. Manual
 dispatch must select the existing tag, not `main`. Draft assets may be replaced

@@ -1,5 +1,21 @@
 # Changelog
 
+## v0.1.3 (release preparation)
+
+- Reuse successful PR regression on main only when the recorded tested Git tree
+  matches exactly. Missing or invalid evidence falls back to full regression.
+  Main still builds, smoke-tests and publishes both native architecture images.
+- Improve release build cache reuse, cache the pinned image publisher and retain
+  tested image artifacts for seven days. Packaged-binary browser tests and
+  PostgreSQL container smoke tests remain required on both architectures.
+- Simplify Users actions: use password and MFA reset icons with translated
+  tooltips, and remove the standalone Revoke sessions action and API. Password
+  reset, MFA reset, logout and account changes retain their session invalidation.
+
+See [v0.1.3 release notes](docs/releases/v0.1.3.md). Schema v5 and the global MFA
+policy are unchanged; MFA remains disabled by default and requires explicit
+configuration when desired.
+
 ## v0.1.2 (2026-10-09)
 
 Published as [Burrow v0.1.2](https://github.com/ArkGravity/burrow/releases/tag/v0.1.2).

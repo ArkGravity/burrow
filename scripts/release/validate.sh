@@ -13,6 +13,9 @@ sha=$(git rev-parse HEAD)
 git fetch --no-tags origin main
 git merge-base --is-ancestor "$sha" FETCH_HEAD || { echo 'Release commit must belong to main.' >&2; exit 1; }
 
+# Main CI requires either a matching successful PR verification record or full
+# regression, then builds, smoke-tests and publishes both images. Require that
+# complete run for this exact commit; PR CI alone cannot authorize a release.
 # API failures are fatal. Never accept another commit's successful CI.
 runs=$(gh api --method GET "repos/$GITHUB_REPOSITORY/actions/workflows/ci.yml/runs" \
   -f branch=main -f event=push -f head_sha="$sha" -f per_page=100)

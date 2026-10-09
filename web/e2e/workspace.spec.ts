@@ -533,6 +533,9 @@ test("expired enrollment, administrator reset and CLI recovery require password 
       target.getByRole("heading", { name: "Your workspace, connected." }),
     ).toBeVisible();
     await page.getByRole("link", { name: "Users", exact: true }).click();
+    await expect(
+      page.getByRole("button", { name: "Revoke sessions", exact: true }),
+    ).toHaveCount(0);
     await page
       .getByRole("row")
       .filter({ hasText: "mfa-recovery" })
@@ -556,11 +559,19 @@ test("expired enrollment, administrator reset and CLI recovery require password 
     await expect(
       target.getByRole("heading", { name: "Your workspace, connected." }),
     ).toBeVisible();
-    const reset = await page.request.put(`/api/v1/users/${user.id}/password`, {
-      headers: { "X-CSRF-Token": csrf },
-      data: { password: "Reset-recovery-password-2026" },
-    });
-    expect(reset.status()).toBe(200);
+    await page
+      .getByRole("row")
+      .filter({ hasText: "mfa-recovery" })
+      .getByRole("button", { name: "Reset password", exact: true })
+      .click();
+    const passwordModal = page.getByRole("dialog");
+    await passwordModal
+      .getByLabel("New password", { exact: true })
+      .fill("Reset-recovery-password-2026");
+    await passwordModal
+      .getByRole("button", { name: "OK", exact: true })
+      .click();
+    await expect(passwordModal).not.toBeVisible();
     await login("Reset-recovery-password-2026");
     await completeMFA(target, secret);
     await changePassword("Final-recovery-password-2026");
