@@ -50,6 +50,13 @@
 
 ## Mandatory MFA upgrade and recovery
 
+以下绑定与验证码步骤适用于 MFA 策略开启时。当前源码默认关闭 MFA，需要时手动设置
+`security.mfa_enabled: true` 或 `BURROW_MFA_ENABLED=true` 统一开启验证，重启生效。
+关闭会保留绑定与密码，临时密码仍须改密；在线 MFA 重置仍要求管理员权限和审计原因，
+只免除动态码。重新开启会拒绝密码登录产生的会话、其未兑换授权码及在线 Token 使用，
+用户需重新完成 MFA；应用自己的会话和离线 ID Token 保持原有期限。
+详见 [全局 MFA 配置](../development/configuration.md#global-mfa-policy)。
+
 迁移 `005_mandatory_mfa.sql` 从 schema v4 升级至 v5，不修改 001–004。它撤销所有旧 Burrow 会话和 Access Token、删除未完成授权及未兑换授权码，并记录同事务审计。用户账号、密码、启用状态、角色/组授权、应用配置和签名密钥保留；所有账号尚未绑定 MFA，下一次密码登录强制绑定。临时密码先改密再绑定。旧 Provider 迁移 004 本身保留密码会话，但本版本继续运行 005 后这些会话也失效。
 
 1. 备份数据库、原 master key 和配置；安排重新登录，并准备认证器。

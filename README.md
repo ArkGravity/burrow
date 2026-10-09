@@ -5,7 +5,7 @@
 English · [简体中文](README_zh.md)
 
 A lightweight, single-organization OpenID Connect identity provider: shared SSO
-sessions, password and mandatory TOTP authentication, users, groups, roles, permissions and
+sessions, password authentication with optional TOTP MFA, users, groups, roles, permissions and
 application access. The Go backend and React web UI ship as one `burrow` binary.
 
 Burrow helps small teams and operators of self-hosted services manage accounts
@@ -26,7 +26,7 @@ deployment packages.
 ## Features
 
 - **Shared SSO:** connect Web and SPA applications with OpenID Connect and PKCE S256.
-- **Password and MFA:** mandatory TOTP, temporary-password changes and administrator recovery.
+- **Password and MFA:** TOTP disabled by default; enable it manually for all accounts through configuration, temporary-password changes and administrator recovery.
 - **Access management:** users, groups, custom roles, permissions and audited management operations.
 - **Application portal:** users see the applications they are allowed to access.
 - **Simple deployment:** one binary with an embedded UI, or Docker Compose with PostgreSQL; no Redis or queue.
@@ -38,14 +38,35 @@ and [Grafana, Nightingale and Harbor setup](examples/local-sso/README.md).
 
 ## Screenshots
 
-Real screenshots of the maintainer's deployed instance, captured on October 2, 2026. The overview shows its current application assignment state.
+Captured by the maintainer on October 9, 2026 during manual browser acceptance of the [local SSO example](examples/local-sso/README.md), in English and dark mode. The `logic` user's portal shows the assigned Grafana and Nightingale applications.
 
-![Burrow overview and application portal in dark mode](docs/screenshots/overview-dark.png)
+![Burrow application portal for the logic user, showing Grafana and Nightingale](docs/screenshots/user-app-overview.jpg)
 
 <details>
-<summary>Role management</summary>
+<summary>Create an application</summary>
 
-![Burrow role management in dark mode](docs/screenshots/roles-dark.png)
+![Create a Nightingale Web application in Burrow](docs/screenshots/create-application.jpg)
+
+</details>
+
+<details>
+<summary>Configure role permissions</summary>
+
+![Configure a role with Grafana and Nightingale login permissions](docs/screenshots/create-roles.jpg)
+
+</details>
+
+<details>
+<summary>Create a group</summary>
+
+![Create a group and assign its shared role in Burrow](docs/screenshots/create-group.jpg)
+
+</details>
+
+<details>
+<summary>Create a user</summary>
+
+![Create the logic user with role and group assignments in Burrow](docs/screenshots/create-user.jpg)
 
 </details>
 
@@ -249,7 +270,7 @@ first release. Clients must verify state, nonce, signature, issuer, audience and
 expiry. Register exact SPA origins for browser access.
 
 Burrow authenticates users with its own passwords; upstream Providers and external
-identity linking have been removed. All users must complete TOTP MFA. New users require a temporary password and
+identity linking have been removed. MFA is disabled by default and requires manual activation. When enabled, all users must complete TOTP. New users require a temporary password and
 must change it before full access. Schema v4 removes the old Provider data and
 settings. Before upgrading, use the previous version to configure passwords and
 enable local login for active users and applications, or disable unused records.
@@ -276,7 +297,7 @@ Version tags additionally run the [release workflow](.github/workflows/release.y
 to prepare tested amd64/arm64 binaries, a shared deployment archive, checksums and versioned multi-platform images
 in a Release draft. See [release preparation and publication](docs/development/releases.md).
 
-MFA setup is mandatory at first login and after an Administrator resets MFA.
+With MFA enabled, setup is mandatory at first login and after an Administrator resets MFA.
 Password login alone creates only a five-minute restricted transaction. Temporary
 password changes and authenticator verification must finish before portal, management
 or OIDC access. Administrators reset MFA with their own unused code and an audit reason;
@@ -284,3 +305,20 @@ this preserves the target password and revokes Burrow sessions/tokens. Password 
 preserves the existing MFA binding. Operators can recover a lost administrator authenticator
 with `burrow mfa-reset --username admin --reason "Lost authenticator"` using the existing
 configuration and master key. Details: [MFA authentication and recovery](docs/development/mfa-proposal.md).
+
+**MFA is disabled by default** (`security.mfa_enabled: false` and
+`BURROW_MFA_ENABLED=false`). To use MFA, manually enable it in the selected YAML file:
+
+```yaml
+security:
+  mfa_enabled: true
+```
+
+Alternatively, set `BURROW_MFA_ENABLED=true` in the service environment (Compose:
+`.env`). Restart the server or recreate the Compose application container after
+changing this setting. Enabling MFA applies to every account, including Administrator.
+Temporary passwords always require a change, and disabling MFA preserves existing
+bindings. Enabling MFA requires users with password-only sessions to log in again
+and complete MFA. See
+[global MFA policy](docs/development/configuration.md#global-mfa-policy). This switch
+is available in the current source and is not included in the published v0.1.1 artifacts.

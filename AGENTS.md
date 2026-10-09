@@ -56,14 +56,21 @@ frontend with `-tags embedweb`; build `web/dist` first, normally through
 ## Authentication and authorization
 
 - Authenticate against the current enabled user and valid shared session with
-  completed MFA and the user's current authentication version. All users require TOTP.
-  Password-only authentication creates a five-minute restricted transaction; complete
-  forced password changes and binding/verification before issuing a shared session.
-- Only Administrator may reset MFA through the API, using their own unused code and
+  the user's current authentication version and completed MFA when the global
+  `security.mfa_enabled` / `BURROW_MFA_ENABLED` policy is enabled (default false;
+  operators must enable it explicitly).
+  Disabling the policy skips TOTP for all accounts, preserves bindings and still
+  requires temporary password changes. Re-enabling rejects password-only sessions,
+  authorization-code exchange and online token use until MFA login completes.
+  Password authentication creates a five-minute restricted transaction when any
+  required steps remain; complete forced password changes and required MFA
+  binding/verification before issuing a shared session.
+- Only Administrator may reset MFA through the API, using their own unused code
+  when the global MFA policy is enabled, and always providing
   an audit reason. Reset clears MFA, increments the authentication version, revokes
   sessions/tokens and deletes pending transactions atomically with the audit. Password
   reset preserves MFA. Operator `mfa-reset` requires server/database access and still
-  forces password login and new binding; do not introduce anonymous recovery or bypasses.
+  forces password login and new binding when MFA is enabled; do not introduce anonymous recovery.
 - Encrypt active and pending TOTP secrets with the existing master key. Persist and
   atomically consume the last accepted time step; prevent replay across binding, login
   and reset. Never expose secrets in lists, logs or audit records.

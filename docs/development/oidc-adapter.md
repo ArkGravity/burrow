@@ -19,7 +19,7 @@
 
 Applications 登记使用 Burrow 登录的下游客户端（如 Grafana、Harbor、Nightingale）。Burrow 在此充当 IdP，应用使用 Burrow 签发的凭据调用其 OIDC 端点。具有 `applications:write` 权限的管理用户可在创建时填写可选 `clientId`、Web `clientSecret`；省略或空字符串自动生成。Client ID 只接受最多 128 个字母、数字和 `-._~`，必须唯一；Secret 为 16–256 个不含空格的可打印 ASCII 字符，仅存哈希并在创建响应中返回一次。SPA 不接受非空 Secret。Client ID/类型创建后不可修改，更新请求不能提交 Secret；通过独立重置接口生成新密钥。审计不记录明文密钥。无需数据库迁移。
 
-Burrow 使用本地账号密码认证用户，向下游应用提供 OIDC 登录。上游 Provider、外部身份绑定和用户/应用认证来源配置已移除。创建用户必须设置临时密码；密码通过后仅创建五分钟受限事务；强制改密及 MFA 绑定/验证完成前不签发正式会话、OIDC 授权码或 Token。正式会话要求 MFA 完成且匹配当前用户认证版本，授权、换码和 UserInfo 均检查当前会话及用户/应用权限。升级到 schema v4 的前置检查和恢复方式见 [升级说明](../operations/recovery.md#upgrade-to-password-only-authentication)。
+Burrow 使用本地账号密码认证用户，向下游应用提供 OIDC 登录。上游 Provider、外部身份绑定和用户/应用认证来源配置已移除。创建用户必须设置临时密码；尚需改密或 MFA 时，密码通过后仅创建五分钟受限事务；必要步骤完成前不签发正式会话、OIDC 授权码或 Token。正式会话要求匹配当前用户认证版本，并在全局 MFA 策略开启时完成 MFA；授权、换码和 UserInfo 均检查当前策略、会话及用户/应用权限。MFA 默认关闭，需要时通过 [全局配置](configuration.md#global-mfa-policy) 手动开启。升级到 schema v4 的前置检查和恢复方式见 [升级说明](../operations/recovery.md#upgrade-to-password-only-authentication)。
 
 ## Web 应用 PKCE 兼容
 
@@ -33,4 +33,4 @@ Nightingale v9.1.1 可作为兼容目标：登记为 Web，显式开启此选项
 
 独立互操作客户端见 [examples](../../examples/README.md)，实际覆盖见 [协议验证记录](../testing/oidc-conformance.md)。本项目未进行 OpenID Foundation 认证，不能据此宣称认证通过。
 
-OIDC `amr` 如实返回 `pwd` 和 `otp`，`auth_time` 是全部认证步骤完成时刻；不声明未定义的 ACR。有效 MFA 会话支持 SSO；`prompt=login` 或触发 `max_age` 的请求需重新完成密码与 MFA，检查精确到请求创建时间，避免同一秒内复用旧会话。`prompt=none` 在受限登录期间返回 `login_required`。MFA 重置撤销共享会话、Access Token 和未兑换授权码，UserInfo 及换码重新检查 MFA/版本；下游自有会话和离线 ID Token 保持既有边界。参见 [MFA](mfa-proposal.md)。
+OIDC `amr` 如实返回认证方式：密码登录为 `pwd`，完成 MFA 的会话为 `pwd` 和 `otp`；`auth_time` 是全部必要认证步骤完成时刻，不声明未定义的 ACR。符合当前策略的有效会话支持 SSO；`prompt=login` 或触发 `max_age` 的请求需重新完成密码及当前策略要求的 MFA，检查精确到请求创建时间，避免同一秒内复用旧会话。`prompt=none` 在受限登录期间返回 `login_required`。MFA 重置撤销共享会话、Access Token 和未兑换授权码，UserInfo 及换码重新检查 MFA 策略/版本；下游自有会话和离线 ID Token 保持既有边界。参见 [MFA](mfa-proposal.md)。

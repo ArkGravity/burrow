@@ -96,7 +96,7 @@ func (c *browser) verifyMFA(t *testing.T) {
 	}
 	secret := ""
 	last := int64(-1)
-	if loginStep(u, l) == "bind" {
+	if c.b.loginStep(u, l) == "bind" {
 		w := c.request("POST", "/api/v1/auth/login/bind", map[string]string{}, true)
 		var result struct{ Secret string }
 		json.Unmarshal(w.Body.Bytes(), &result)
@@ -135,7 +135,7 @@ func openTestStore(t *testing.T, driver string) *Store {
 			t.Skip("BURROW_TEST_POSTGRES_DSN not configured")
 		}
 	}
-	c := Config{Env: "dev", Issuer: "http://localhost:8080", DBDriver: driver, DBDSN: dsn}
+	c := Config{Env: "dev", Issuer: "http://localhost:8080", DBDriver: driver, DBDSN: dsn, MFAEnabled: true}
 	copy(c.MasterKey[:], []byte("01234567890123456789012345678901"))
 	s, e := Open(c)
 	if e != nil {

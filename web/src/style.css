@@ -88,10 +88,6 @@ p {
   flex-shrink: 0;
   object-fit: contain;
 }
-.brand-dot {
-  color: #94b291;
-  margin-left: 1px;
-}
 .brand.light {
   color: #f3f6eb;
 }
@@ -629,7 +625,6 @@ main {
     border: 0;
     justify-content: center;
   }
-  .brand-dot,
   .workspace-label > div,
   .workspace-label > .status-dot,
   .nav-label,

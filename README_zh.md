@@ -6,8 +6,9 @@
 
 **面向小团队和自托管服务的轻量 OIDC 单点登录服务。**
 
-Burrow 帮助你集中管理账户、登录和应用访问权限。用户使用 Burrow 密码和 TOTP
-验证器登录，通过 OpenID Connect 接入支持该协议的应用，并在个人门户中查看自己可以访问的服务。
+Burrow 帮助你集中管理账户、登录和应用访问权限。用户默认使用 Burrow 密码登录，
+MFA 默认关闭，需要时手动开启 TOTP 验证。通过 OpenID Connect 接入支持该协议的应用，
+并在个人门户中查看自己可以访问的服务。
 
 项目受 Casdoor 启发，采用独立实现，专注单组织、单实例部署。Go 后端和 React
 界面打包为一个 `burrow` 二进制，也提供 Docker Compose 部署方式；生产环境使用
@@ -19,31 +20,52 @@ PostgreSQL，开发和测试支持 SQLite，无需 Redis 或消息队列。
 
 ## 主要功能
 
-| 功能             | 说明                                                                   |
-| ---------------- | ---------------------------------------------------------------------- |
-| 单点登录         | 共享 Burrow 登录会话，支持 Web 和 SPA 应用接入 OIDC                    |
-| 密码与多因素认证 | 所有用户必须使用 TOTP；支持首次修改临时密码、管理员重置 MFA 和运维恢复 |
-| 用户与用户组     | 集中管理用户、分组及角色分配                                           |
-| 角色与权限       | 通过自定义角色控制管理权限和应用登录权限，支持用户直接授权和用户组授权 |
-| 应用门户         | 展示当前用户获准访问的应用，应用自行发起 OIDC 登录                     |
-| 管理操作审计     | 管理变更与审计记录在同一事务中提交                                     |
-| 个人资料         | 用户可管理自己的资料和密码                                             |
-| 双语与主题       | 支持英文、简体中文，以及浅色、深色和跟随系统主题                       |
+| 功能             | 说明                                                                           |
+| ---------------- | ------------------------------------------------------------------------------ |
+| 单点登录         | 共享 Burrow 登录会话，支持 Web 和 SPA 应用接入 OIDC                            |
+| 密码与多因素认证 | MFA 默认关闭，需手动开启全员 TOTP；支持临时密码改密、管理员重置 MFA 和运维恢复 |
+| 用户与用户组     | 集中管理用户、分组及角色分配                                                   |
+| 角色与权限       | 通过自定义角色控制管理权限和应用登录权限，支持用户直接授权和用户组授权         |
+| 应用门户         | 展示当前用户获准访问的应用，应用自行发起 OIDC 登录                             |
+| 管理操作审计     | 管理变更与审计记录在同一事务中提交                                             |
+| 个人资料         | 用户可管理自己的资料和密码                                                     |
+| 双语与主题       | 支持英文、简体中文，以及浅色、深色和跟随系统主题                               |
 
 Burrow 管理身份与应用访问权限；接入应用中的业务权限和应用自身会话由应用管理。
 
 ## 界面预览
 
-以下截图于 **2026-10-02** 从维护者实际部署的生产实例中获取。总览中的应用区域展示该实例当时的授权状态。
+以下截图由维护者于 **2026-10-09** 在[本地 SSO 示例](examples/local-sso/README.md)的浏览器人工验收过程中拍摄，使用英文界面与深色主题。普通用户 `logic` 的门户展示已获授权的 Grafana 和 Nightingale 应用。
 
-**总览与应用门户（深色主题）**
+**普通用户应用门户（深色主题）**
 
-![Burrow 总览与应用门户，深色主题](docs/screenshots/overview-dark.png)
+![普通用户 logic 的 Burrow 应用门户，展示 Grafana 和 Nightingale](docs/screenshots/user-app-overview.jpg)
 
 <details>
-<summary>角色管理（深色主题）</summary>
+<summary>创建应用</summary>
 
-![Burrow 角色管理，深色主题](docs/screenshots/roles-dark.png)
+![在 Burrow 中创建 Nightingale Web 应用](docs/screenshots/create-application.jpg)
+
+</details>
+
+<details>
+<summary>配置角色权限</summary>
+
+![为普通角色配置 Grafana 和 Nightingale 的登录权限](docs/screenshots/create-roles.jpg)
+
+</details>
+
+<details>
+<summary>创建用户组</summary>
+
+![在 Burrow 中创建用户组并分配共享角色](docs/screenshots/create-group.jpg)
+
+</details>
+
+<details>
+<summary>创建用户</summary>
+
+![在 Burrow 中创建 logic 用户并分配角色和用户组](docs/screenshots/create-user.jpg)
 
 </details>
 
@@ -139,7 +161,8 @@ make run       # 后端：http://localhost:8080
 make web-dev   # 前端：http://localhost:5173
 ```
 
-开发示例账号为 `admin` / `Burrow-development-admin-2026`，首次登录需修改密码并绑定 TOTP。
+开发示例账号为 `admin` / `Burrow-development-admin-2026`，首次登录需修改密码。
+MFA 默认关闭；手动开启后，登录时还需绑定并验证 TOTP。
 如需自定义初始管理员，请在首次 seed 前修改本地配置。重复 seed 不会重置已有密码、账户状态或授权关系。
 
 原生命令直接读取 YAML，不加载 `.env`。需要本机专用配置时：
@@ -153,6 +176,21 @@ make run CONFIG=configs/config.local.yaml
 ```
 
 配置优先级为嵌入默认值、选定的 YAML 文件、已导出的 `BURROW_*` 环境变量。
+
+**当前源码默认不开启 MFA**：`security.mfa_enabled` 和 `BURROW_MFA_ENABLED`
+默认均为 `false`。需要 MFA 功能时，必须手动在选定的 YAML 文件中开启：
+
+```yaml
+security:
+  mfa_enabled: true
+```
+
+也可以设置环境变量 `BURROW_MFA_ENABLED=true`；Compose 将该变量写入 `.env`
+后重建应用容器，原生服务使用 YAML 或导出的环境变量，修改后重启。
+开启后所有账户（含管理员）都需完成 TOTP 验证。临时密码始终需要改密，
+关闭 MFA 会保留已有绑定；开启后，密码登录产生的会话需重新登录并完成 MFA。
+此开关不属于已发布的 v0.1.1，旧发布版本仍要求 MFA。
+详见[全局 MFA 配置](docs/development/configuration.md#global-mfa-policy)。
 生产环境拒绝公开的示例主密钥和管理员密码；已有数据库必须保留原始主密钥。
 
 ## 构建与检查

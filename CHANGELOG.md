@@ -1,10 +1,24 @@
 # Changelog
 
-## Unreleased
+## v0.1.2 (release preparation)
+
+- Add a global MFA policy through `security.mfa_enabled` and
+  `BURROW_MFA_ENABLED`, disabled by default. Enable it explicitly to require
+  TOTP for every account. Preserve existing bindings and forced temporary
+  password changes; OIDC authentication claims reflect the actual login.
+- Remove the trailing slash from the login brand and log out directly from the
+  signed-in shell with one click.
+- Explain password policy errors and validate the 12–256 UTF-8 byte limit in
+  user creation, password reset and password change forms.
+- Refresh both READMEs with maintainer-supplied local acceptance screenshots
+  and add application icon examples for Grafana and Nightingale.
 
 - Publish only a unified multi-platform image tag per commit or version in GHCR
   and Docker Hub. Upload tested amd64 and arm64 images by digest without creating
   architecture-suffixed tags.
+
+See [v0.1.2 release notes](docs/releases/v0.1.2.md) for installation and the MFA
+upgrade setting. Schema v5 is unchanged.
 
 ## v0.1.1 (2026-10-07)
 

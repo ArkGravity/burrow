@@ -13,6 +13,7 @@ x-burrow: &burrow
     BURROW_DB_DSN: /data/burrow.db
     # Public examples for this isolated development database only.
     BURROW_MASTER_KEY: MDEyMzQ1Njc4OTAxMjM0NTY3ODkwMTIzNDU2Nzg5MDE=
+    BURROW_MFA_ENABLED: ${BURROW_MFA_ENABLED:-false}
     BURROW_BOOTSTRAP_ADMIN_USERNAME: admin
     BURROW_BOOTSTRAP_ADMIN_NAME: Administrator
     BURROW_BOOTSTRAP_ADMIN_EMAIL: admin@example.test

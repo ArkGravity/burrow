@@ -17,6 +17,7 @@ export interface LoginState {
 export interface Session {
   user: User;
   administrator: boolean;
+  mfaRequired: boolean;
   permissions: string[];
   redirect?: string;
 }

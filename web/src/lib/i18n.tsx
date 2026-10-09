@@ -15,10 +15,13 @@ const en = {
   mfaRecoveryHint:
     "Lost your authenticator? Contact your administrator to reset MFA. Your next password login will require setup again.",
   mfaBound: "MFA is bound",
+  mfaDisabled: "MFA verification is disabled for all accounts",
   mfaUnbound: "Setup required",
   mfaReset: "Reset MFA",
   mfaResetHint:
     "This revokes the user’s Burrow sessions and requires setup at the next password login. Their password remains the same. Enter your own unused authenticator code and a reason.",
+  mfaResetDisabledHint:
+    "This clears the user’s MFA binding and revokes their Burrow sessions. Their password remains the same. Enter a reset reason.",
   mfaReason: "Reset reason",
   mfaInvalidCode:
     "The code is invalid, expired or already used. After five failures, start again with password.",
@@ -96,7 +99,8 @@ const en = {
   required: "This field is required",
   invalidEmail: "Enter a valid email",
   passwordMismatch: "Passwords do not match",
-  passwordHint: "Use at least 12 characters",
+  passwordHint:
+    "Use 12–256 bytes for your password (English characters count as one byte; other characters may count as more).",
   clientId: "Client ID",
   applicationLoginPermission: "Login",
   clientType: "Client type",
@@ -160,10 +164,13 @@ const zh: Record<Key, string> = {
   mfaRecoveryHint:
     "无法使用身份验证器？请联系管理员重置 MFA，之后使用密码登录并重新绑定。",
   mfaBound: "MFA 已绑定",
+  mfaDisabled: "所有账户的 MFA 验证已关闭",
   mfaUnbound: "待绑定",
   mfaReset: "重置 MFA",
   mfaResetHint:
     "此操作将撤销该用户的 Burrow 会话，下次密码登录时强制重新绑定，密码保持不变。请输入你自己的未使用动态码和重置原因。",
+  mfaResetDisabledHint:
+    "此操作将清除该用户的 MFA 绑定并撤销其 Burrow 会话，密码保持不变。请输入重置原因。",
   mfaReason: "重置原因",
   mfaInvalidCode:
     "动态码无效、已过期或已使用。累计五次失败后需重新使用密码登录。",
@@ -239,7 +246,8 @@ const zh: Record<Key, string> = {
   required: "此项为必填项",
   invalidEmail: "请输入有效邮箱",
   passwordMismatch: "两次输入的密码不一致",
-  passwordHint: "请使用至少 12 位字符",
+  passwordHint:
+    "密码长度需为 12–256 字节（英文字符计 1 字节，中文等字符占多个字节）。",
   clientId: "客户端 ID",
   applicationLoginPermission: "登录",
   clientType: "客户端类型",
@@ -297,6 +305,7 @@ export function useI18n() {
 }
 export type TranslationKey = Key;
 export function errorKey(code: string): Key {
+  if (/PASSWORD_POLICY/.test(code)) return "passwordHint";
   if (/INVALID_MFA_CODE/.test(code)) return "mfaInvalidCode";
   if (/INVALID_TRANSACTION|INVALID_STEP/.test(code)) return "loginExpired";
   if (/RATE_LIMITED/.test(code)) return "rateLimited";
