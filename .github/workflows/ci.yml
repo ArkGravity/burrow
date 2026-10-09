@@ -14,7 +14,27 @@ concurrency:
   cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
+  plan:
+    name: Choose regression coverage
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      actions: read
+      pull-requests: read
+    outputs:
+      full_regression: ${{ steps.plan.outputs.full_regression }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Require full regression unless the merged PR tested this exact tree
+        id: plan
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 scripts/ci/verification.py plan
+
   web:
+    needs: [plan]
+    if: needs.plan.outputs.full_regression == 'true'
     name: Web checks
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -36,6 +56,8 @@ jobs:
         run: bun run build
 
   backend-quality:
+    needs: [plan]
+    if: needs.plan.outputs.full_regression == 'true'
     name: Backend quality
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -48,8 +70,12 @@ jobs:
         run: make lint
       - name: Release gate, packaging and image publication regression tests
         run: python3 -m unittest discover -s scripts/release -p 'test_*.py'
+      - name: CI verification reuse and job aggregation regression tests
+        run: python3 -m unittest discover -s scripts/ci -p 'test_*.py'
 
   backend-test:
+    needs: [plan]
+    if: needs.plan.outputs.full_regression == 'true'
     name: Backend SQLite and PostgreSQL tests (${{ matrix.arch }})
     strategy:
       fail-fast: false
@@ -85,6 +111,8 @@ jobs:
         run: make test-db
 
   browser:
+    needs: [plan]
+    if: needs.plan.outputs.full_regression == 'true'
     name: Browser and OIDC regression tests (${{ matrix.arch }})
     strategy:
       fail-fast: false
@@ -129,6 +157,22 @@ jobs:
             runner: ubuntu-24.04-arm
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 30
+    services:
+      postgres:
+        # PR/dev builds need no extra database; main tests the actual image.
+        image: ${{ github.ref == 'refs/heads/main' && 'postgres:17-alpine' || '' }}
+        env:
+          POSTGRES_USER: burrow
+          POSTGRES_PASSWORD: ci-test-only
+          POSTGRES_DB: burrow_image_test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U burrow -d burrow_image_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      BURROW_TEST_POSTGRES_DSN: host=127.0.0.1 port=5432 user=burrow password=ci-test-only dbname=burrow_image_test sslmode=disable
     steps:
       - uses: actions/checkout@v4
       - name: Validate deployment configuration
@@ -156,6 +200,9 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha,scope=burrow-image-${{ matrix.arch }}
           cache-to: type=gha,scope=burrow-image-${{ matrix.arch }},mode=max
+      - name: Test production image startup with PostgreSQL
+        if: github.ref == 'refs/heads/main'
+        run: bash scripts/release/smoke-image.sh "burrow:ci-${{ matrix.arch }}"
       - name: Save verified image for main publication
         if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref == 'refs/heads/main'
         env:
@@ -169,29 +216,36 @@ jobs:
           name: ci-image-${{ matrix.arch }}
           path: bin/image-${{ matrix.arch }}.tar
           if-no-files-found: error
-          retention-days: 1
+          overwrite: true
+          retention-days: 7
 
   # Keep the existing check name while collecting every verification job.
   verify:
     if: always()
-    needs: [web, backend-quality, backend-test, browser, image-build]
+    needs: [plan, web, backend-quality, backend-test, browser, image-build]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - name: Require all checks to pass
+      - uses: actions/checkout@v4
+      - name: Require every check selected by the regression plan
         env:
-          CHECK_RESULTS: ${{ join(needs.*.result, ' ') }}
-        run: |
-          for result in $CHECK_RESULTS; do
-            if [ "$result" != "success" ]; then
-              echo '::error::A required CI job did not succeed.'
-              exit 1
-            fi
-          done
+          NEEDS_JSON: ${{ toJSON(needs) }}
+        run: python3 scripts/ci/verification.py verify
+      - name: Record the exact tree tested by this PR
+        if: github.event_name == 'pull_request'
+        run: python3 scripts/ci/verification.py record
+      - uses: actions/upload-artifact@v4
+        if: github.event_name == 'pull_request'
+        with:
+          name: ci-verification
+          path: verification.json
+          if-no-files-found: error
+          overwrite: true
+          retention-days: 30
 
   image:
     name: Publish dual-architecture images to GHCR and Docker Hub
-    if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref == 'refs/heads/main'
+    if: "!cancelled() && needs.verify.result == 'success' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref == 'refs/heads/main'"
     needs: [verify]
     runs-on: ubuntu-latest
     timeout-minutes: 30
@@ -208,12 +262,24 @@ jobs:
           pattern: ci-image-*
           merge-multiple: true
           path: bin
+      - name: Restore pinned digest image publisher
+        id: crane-cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}/burrow-crane/crane
+          key: crane-${{ runner.os }}-${{ runner.arch }}-v0.22.1
       - uses: actions/setup-go@v5
+        if: steps.crane-cache.outputs.cache-hit != 'true'
         with:
           go-version-file: go.mod
           cache: false
       - name: Install digest image publisher
+        if: steps.crane-cache.outputs.cache-hit != 'true'
+        env:
+          GOBIN: ${{ runner.temp }}/burrow-crane
         run: go install github.com/google/go-containerregistry/cmd/crane@v0.22.1
+      - name: Add digest publisher to PATH
+        run: echo "$RUNNER_TEMP/burrow-crane" >>"$GITHUB_PATH"
       - name: Check publishing configuration
         env:
           DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}

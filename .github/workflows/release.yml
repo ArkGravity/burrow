@@ -127,13 +127,15 @@ jobs:
           name: release-assets-${{ matrix.arch }}
           path: release-assets/
           if-no-files-found: error
+          overwrite: true
           retention-days: 7
       - uses: actions/upload-artifact@v4
         with:
           name: release-image-${{ matrix.arch }}
           path: bin/image-${{ matrix.arch }}.tar
           if-no-files-found: error
-          retention-days: 1
+          overwrite: true
+          retention-days: 7
       - uses: actions/upload-artifact@v4
         if: failure()
         with:
@@ -172,12 +174,24 @@ jobs:
           pattern: release-image-*
           merge-multiple: true
           path: bin
+      - name: Restore pinned digest image publisher
+        id: crane-cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}/burrow-crane/crane
+          key: crane-${{ runner.os }}-${{ runner.arch }}-v0.22.1
       - uses: actions/setup-go@v5
+        if: steps.crane-cache.outputs.cache-hit != 'true'
         with:
           go-version-file: go.mod
           cache: false
       - name: Install digest image publisher
+        if: steps.crane-cache.outputs.cache-hit != 'true'
+        env:
+          GOBIN: ${{ runner.temp }}/burrow-crane
         run: go install github.com/google/go-containerregistry/cmd/crane@v0.22.1
+      - name: Add digest publisher to PATH
+        run: echo "$RUNNER_TEMP/burrow-crane" >>"$GITHUB_PATH"
       - name: Check registry configuration
         env:
           DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
