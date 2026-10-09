@@ -1,6 +1,8 @@
 # Changelog
 
-## v0.1.2 (release preparation)
+## v0.1.2 (2026-10-09)
+
+Published as [Burrow v0.1.2](https://github.com/ArkGravity/burrow/releases/tag/v0.1.2).
 
 - Add a global MFA policy through `security.mfa_enabled` and
   `BURROW_MFA_ENABLED`, disabled by default. Enable it explicitly to require

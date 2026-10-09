@@ -14,8 +14,8 @@ MFA 默认关闭，需要时手动开启 TOTP 验证。通过 OpenID Connect 接
 界面打包为一个 `burrow` 二进制，也提供 Docker Compose 部署方式；生产环境使用
 PostgreSQL，开发和测试支持 SQLite，无需 Redis 或消息队列。
 
-- [源码仓库](https://github.com/ArkGravity/burrow) · [v0.1.1 正式版](https://github.com/ArkGravity/burrow/releases/tag/v0.1.1)
-- [安装指南](https://github.com/ArkGravity/burrow/releases/download/v0.1.1/INSTALL.md) · [版本说明（含中文）](docs/releases/v0.1.1.md) · [更新记录](CHANGELOG.md)
+- [源码仓库](https://github.com/ArkGravity/burrow) · [v0.1.2 正式版](https://github.com/ArkGravity/burrow/releases/tag/v0.1.2)
+- [安装指南](https://github.com/ArkGravity/burrow/releases/download/v0.1.2/INSTALL.md) · [版本说明（含中文）](docs/releases/v0.1.2.md) · [更新记录](CHANGELOG.md)
 - [文档索引](docs/README.md) · [配置参考](docs/development/configuration.md) · [OIDC 接入示例](examples/README.md)
 
 ## 主要功能
@@ -69,18 +69,18 @@ Burrow 管理身份与应用访问权限；接入应用中的业务权限和应�
 
 </details>
 
-## 安装 v0.1.1
+## 安装 v0.1.2
 
 发布产物支持 **Linux amd64 和 arm64**，Docker 根据宿主架构自动选择镜像。推荐使用容器部署。原生二进制要求
 glibc 2.36 或更新版本，例如 Debian 12。二进制和容器均已包含前端，运行时无需安装 Go 或 Bun。
 
-从 [Release 页面](https://github.com/ArkGravity/burrow/releases/tag/v0.1.1)
-下载部署包 `burrow_v0.1.1_deploy.tar.gz`。`SHA256SUMS` 提供附件校验和，
-`IMAGES.txt` 提供镜像及摘要；完整校验步骤见[安装指南](https://github.com/ArkGravity/burrow/releases/download/v0.1.1/INSTALL.md)。
+从 [Release 页面](https://github.com/ArkGravity/burrow/releases/tag/v0.1.2)
+下载部署包 `burrow_v0.1.2_deploy.tar.gz`。`SHA256SUMS` 提供附件校验和，
+`IMAGES.txt` 提供镜像及摘要；完整校验步骤见[安装指南](https://github.com/ArkGravity/burrow/releases/download/v0.1.2/INSTALL.md)。
 
 ```bash
-tar -xzf burrow_v0.1.1_deploy.tar.gz
-cd burrow_v0.1.1_deploy
+tar -xzf burrow_v0.1.2_deploy.tar.gz
+cd burrow_v0.1.2_deploy
 cp .env.example .env
 
 openssl rand -base64 32 # 生成独立的主加密密钥
@@ -93,7 +93,7 @@ openssl rand -hex 24    # 生成初始管理员临时密码
 - 将 `BURROW_ENV` 设为 `prod`，将 `BURROW_ISSUER` 设为实际的 HTTPS 访问地址。
 - 将 `BURROW_MASTER_KEY` 和 `BURROW_BOOTSTRAP_ADMIN_PASSWORD` 设为上面生成的独立值。
 - 设置 `POSTGRES_PASSWORD`，并在 `BURROW_DB_DSN` 中使用相同的数据库密码。
-- 使用包中固定的 `ghcr.io/arkgravity/burrow:v0.1.1` 镜像；也可切换到 `docker.io/logic3579/burrow:v0.1.1`，或使用摘要固定镜像。
+- 使用包中固定的 `ghcr.io/arkgravity/burrow:v0.1.2` 镜像；也可切换到 `docker.io/logic3579/burrow:v0.1.2`，或使用摘要固定镜像。
 - 配置 TLS 反向代理和实际受信任的代理 CIDR。默认服务端口仅绑定宿主机回环地址，数据库不暴露到宿主机。
 
 ```bash
@@ -105,7 +105,8 @@ curl --fail http://127.0.0.1:8080/readyz
 ```
 
 Compose 按“迁移 → 初始化管理员 → 启动服务”的顺序执行。首次登录使用你配置的管理员账号和临时密码，
-按提示修改密码并绑定 TOTP 验证器，完成后才能访问门户、管理功能和 OIDC 应用。
+按提示修改密码后即可访问门户、管理功能和获授权的 OIDC 应用。MFA 默认关闭；
+需要全员 TOTP 时，手动在 `.env` 中设置 `BURROW_MFA_ENABLED=true` 并重建应用容器。
 
 使用外部 PostgreSQL 时，修改数据库连接及 TLS 设置，并省略 `--profile local-db`。
 升级前备份数据库、原始主密钥和配置；停止服务时保留数据库卷。
@@ -177,7 +178,7 @@ make run CONFIG=configs/config.local.yaml
 
 配置优先级为嵌入默认值、选定的 YAML 文件、已导出的 `BURROW_*` 环境变量。
 
-**当前源码默认不开启 MFA**：`security.mfa_enabled` 和 `BURROW_MFA_ENABLED`
+**默认不开启 MFA**：`security.mfa_enabled` 和 `BURROW_MFA_ENABLED`
 默认均为 `false`。需要 MFA 功能时，必须手动在选定的 YAML 文件中开启：
 
 ```yaml
@@ -189,7 +190,8 @@ security:
 后重建应用容器，原生服务使用 YAML 或导出的环境变量，修改后重启。
 开启后所有账户（含管理员）都需完成 TOTP 验证。临时密码始终需要改密，
 关闭 MFA 会保留已有绑定；开启后，密码登录产生的会话需重新登录并完成 MFA。
-此开关不属于已发布的 v0.1.1，旧发布版本仍要求 MFA。
+此开关从 v0.1.2 开始提供，历史 v0.1.0/v0.1.1 仍要求 MFA。
+从旧版本升级时，若要保留 MFA 要求，请在启动新版前显式设为 `true`。
 详见[全局 MFA 配置](docs/development/configuration.md#global-mfa-policy)。
 生产环境拒绝公开的示例主密钥和管理员密码；已有数据库必须保留原始主密钥。
 
@@ -222,7 +224,7 @@ make test-e2e         # Chromium、MFA 和独立 Web / SPA OIDC 流程
 CI 在 Linux amd64 和 arm64 原生 runner 上检查 SQLite / PostgreSQL、浏览器流程和容器构建，
 并执行前端与静态检查；全部通过后向 GHCR 和 Docker Hub 发布双架构镜像。
 Release 分别测试两种架构的二进制与容器，发布独立二进制包和共享 Compose 部署包。
-v0.1.1 的双架构 CI 与 Release 已通过并正式发布；历史 v0.1.0 仍仅提供 amd64。
+v0.1.2 的双架构 CI 与 Release 已通过并正式发布；历史 v0.1.0 仍仅提供 amd64。
 查看 [CI 与镜像发布](docs/development/ci.md)、[MFA 与恢复](docs/development/mfa-proposal.md)
 和[发布流程](docs/development/releases.md)。
 

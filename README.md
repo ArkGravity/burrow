@@ -18,8 +18,8 @@ implemented, with a focused OIDC scope and a single-instance deployment.
 The UI supports English and Simplified Chinese, with light, dark and system themes.
 PostgreSQL is used in production; SQLite is available for local development.
 
-Burrow uses the [MIT license](LICENSE). [Version `v0.1.1`](https://github.com/ArkGravity/burrow/releases/tag/v0.1.1) is available;
-see [release notes](docs/releases/v0.1.1.md), [installation instructions](https://github.com/ArkGravity/burrow/releases/download/v0.1.1/INSTALL.md)
+Burrow uses the [MIT license](LICENSE). [Version `v0.1.2`](https://github.com/ArkGravity/burrow/releases/tag/v0.1.2) is available;
+see [release notes](docs/releases/v0.1.2.md), [installation instructions](https://github.com/ArkGravity/burrow/releases/download/v0.1.2/INSTALL.md)
 and the [changelog](CHANGELOG.md) for Linux amd64/arm64 binaries, container images and
 deployment packages.
 
@@ -32,7 +32,7 @@ deployment packages.
 - **Simple deployment:** one binary with an embedded UI, or Docker Compose with PostgreSQL; no Redis or queue.
 - **Localized UI:** English and Simplified Chinese, with light, dark and system themes.
 
-For a first installation, use the [v0.1.1 installation guide](https://github.com/ArkGravity/burrow/releases/download/v0.1.1/INSTALL.md).
+For a first installation, use the [v0.1.2 installation guide](https://github.com/ArkGravity/burrow/releases/download/v0.1.2/INSTALL.md).
 For downstream integrations, see the [Web and SPA examples](examples/README.md)
 and [Grafana, Nightingale and Harbor setup](examples/local-sso/README.md).
 
@@ -321,4 +321,4 @@ Temporary passwords always require a change, and disabling MFA preserves existin
 bindings. Enabling MFA requires users with password-only sessions to log in again
 and complete MFA. See
 [global MFA policy](docs/development/configuration.md#global-mfa-policy). This switch
-is available in the current source and is not included in the published v0.1.1 artifacts.
+was introduced in v0.1.2; historical v0.1.0/v0.1.1 artifacts require MFA.

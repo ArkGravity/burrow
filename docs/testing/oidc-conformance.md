@@ -1,5 +1,14 @@
 # 协议与回归验证记录
 
+## 2026-10-09：v0.1.2 正式发布
+
+- 用户授权提交全部变更、推送、创建 PR、合并 `main` 并发布 v0.1.2。修复及发布准备提交 `cd9130c` 经[完整 PR CI](https://github.com/ArkGravity/burrow/actions/runs/37957443924) 通过后，[PR #5](https://github.com/ArkGravity/burrow/pull/5) squash 合并到 `bc6b77ea8bbcca7d86bf5775ac8a1c6530d9dfc2`。该提交的[完整 main CI](https://github.com/ArkGravity/burrow/actions/runs/37958376960) 全部成功，包括原生 amd64/arm64 双数据库 race、浏览器、镜像、静默 Compose 校验和双仓库主分支镜像发布。随后在此提交创建并推送 annotated tag `v0.1.2`。
+- [Release 工作流](https://github.com/ArkGravity/burrow/actions/runs/37959391939) 的 validate、两个原生 prepare 和 draft 全部成功。两种架构的实际镜像二进制经提取、打包后均通过五条 SQLite/MFA/OIDC 浏览器流程，并通过生产模式 PostgreSQL 容器的迁移、重复 seed、启动、readiness、healthcheck 和内嵌前端检查。发布复用已测试镜像，没有重新构建。
+- 六个附件均下载复核，与 GitHub API 的 digest 一致；`SHA256SUMS` 覆盖另外五个附件。两个二进制的 ELF 架构、执行权限、许可证和默认关闭 MFA 的 YAML 已检查，Go 元信息确认 Go 1.27.1、Linux、对应架构、CGO 和 embedweb；本机未执行 Linux 二进制，其运行测试由上述原生 Release jobs 完成。共享部署包使用原根 Compose 和固定版本环境示例，安装指南明确默认关闭 MFA、需手动开启及旧版本升级配置。
+- 两个仓库的 `v0.1.2` manifest 均独立验证匿名可读，恰好包含 `linux/amd64` 和 `linux/arm64`，共同 index digest 为 `sha256:367d7b0334e6e37bc89cb5b419b1933ac7b55179d3cd522456a8b27c0da5d81a`；amd64 为 `sha256:70dfda46834041473815a7d6788e8f69ffddf6656da310964a8f38754a988bb9`，arm64 为 `sha256:77a8ad2cc5f3a506ac205a2807acc3ff74d27d2fbe52ab9ac2410ed834216632`。
+- [Burrow v0.1.2](https://github.com/ArkGravity/burrow/releases/tag/v0.1.2) 于 `2026-10-09T16:40:46Z` 正式发布。GitHub API 确认 `draft=false`、`prerelease=false`、Latest 为 v0.1.2，六个附件均 uploaded。中英文 README 安装链接与更新记录已同步。源 tag 保持上述已测试提交，历史 v0.1.0/v0.1.1 产物未替换。
+- 新版 MFA 默认关闭；从旧版升级并希望继续要求 MFA 时，必须在启动新版前显式设为 `true`。schema v5 与迁移保持不变。本轮发布检查不代表生产部署、此次 Grafana/Nightingale 下游 SSO 验收或官方 OIDC 认证；用户已报告的本地管理和新用户登录/门户验收保持独立。本地验收容器及数据保留。
+
 ## 2026-10-09：登录品牌、单击退出与全局 MFA 开关
 
 - 在新分支 `fix/login-logout-mfa-config` 移除登录品牌后的 `/`，将站内退出改为带 CSRF 的直接 POST 并返回登录页。应用发起的 OIDC 退出仍使用确认及精确重定向校验。
