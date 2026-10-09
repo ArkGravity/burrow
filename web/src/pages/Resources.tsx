@@ -13,6 +13,7 @@ import {
   Switch,
   Table,
   Tag,
+  Tooltip,
   Typography,
 } from "antd";
 import {
@@ -22,7 +23,8 @@ import {
   EditOutlined,
   DeleteOutlined,
   KeyOutlined,
-  StopOutlined,
+  LockOutlined,
+  SafetyCertificateOutlined,
 } from "@ant-design/icons";
 import { api, write, APIError, type Row, type List } from "../lib/api";
 import { can } from "../lib/access";
@@ -361,7 +363,7 @@ export function Resources({ resource }: { resource: string }) {
           {
             title: t("actions"),
             key: "actions",
-            width: 210,
+            width: resource === "users" ? 180 : 210,
             render: (_: unknown, row: Row) => (
               <Space wrap size={4}>
                 <Button
@@ -374,42 +376,32 @@ export function Resources({ resource }: { resource: string }) {
                 />
                 {resource === "users" && (
                   <>
-                    <Button
-                      size="small"
-                      type="text"
-                      aria-label={t("resetPassword")}
-                      icon={<KeyOutlined />}
-                      onClick={() => {
-                        passwordForm.resetFields();
-                        setPasswordUser(row);
-                      }}
-                    />
-                    {session?.administrator && (
+                    <Tooltip title={t("resetPassword")}>
                       <Button
                         size="small"
                         type="text"
-                        aria-label={t("mfaReset")}
+                        aria-label={t("resetPassword")}
+                        icon={<LockOutlined />}
                         onClick={() => {
-                          mfaForm.resetFields();
-                          setMFAUser(row);
+                          passwordForm.resetFields();
+                          setPasswordUser(row);
                         }}
-                      >
-                        {t("mfaReset")}
-                      </Button>
-                    )}
-                    <Popconfirm
-                      title={t("revokeSessions")}
-                      onConfirm={() =>
-                        action(`/users/${row.id}/revoke-sessions`)
-                      }
-                    >
-                      <Button
-                        size="small"
-                        type="text"
-                        aria-label={t("revokeSessions")}
-                        icon={<StopOutlined />}
                       />
-                    </Popconfirm>
+                    </Tooltip>
+                    {session?.administrator && (
+                      <Tooltip title={t("mfaReset")}>
+                        <Button
+                          size="small"
+                          type="text"
+                          aria-label={t("mfaReset")}
+                          icon={<SafetyCertificateOutlined />}
+                          onClick={() => {
+                            mfaForm.resetFields();
+                            setMFAUser(row);
+                          }}
+                        />
+                      </Tooltip>
+                    )}
                   </>
                 )}
                 {resource === "applications" && row.clientType !== "spa" && (
