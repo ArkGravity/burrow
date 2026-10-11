@@ -15,7 +15,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/logic3579/burrow/configs"
+	"github.com/ArkGravity/burrow/configs"
 	"gopkg.in/yaml.v3"
 )
 

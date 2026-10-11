@@ -1,13 +1,18 @@
 # Install Burrow
 
 This release supports Linux amd64 and arm64. Download attachments from
-[GitHub Releases](https://github.com/ArkGravity/burrow/releases). Verify the
-downloaded files with `sha256sum --check SHA256SUMS` in the download directory.
-Download every listed attachment before checking the complete checksum file.
+[GitHub Releases](https://github.com/ArkGravity/burrow/releases). Verify selected
+downloaded files with `sha256sum --ignore-missing --check SHA256SUMS` in the download
+directory and ensure the selected archive reports `OK`. If you download every
+listed attachment, use `sha256sum --check SHA256SUMS` to check the complete list.
 `IMAGES.txt` lists the multi-platform version tags and platform references
 (`repository@sha256:...`) with their registry digests. New publications create
 only the multi-platform version tag. The historical v0.1.0 release supports
 amd64 only; follow its attached installation guide when installing that version.
+
+For the readable installation and first-login guide, see
+[English](https://github.com/ArkGravity/burrow/blob/@VERSION@/docs/installation.md)
+or [简体中文](https://github.com/ArkGravity/burrow/blob/@VERSION@/docs/installation_zh.md).
 
 ## Containers (recommended)
 
@@ -114,3 +119,6 @@ Burrow is released under the included MIT license. These are early releases;
 future releases may require configuration, API or database migrations. Automated
 OIDC interoperability checks and historical manual acceptance do not constitute
 OpenID Foundation certification or validation of your production deployment.
+Report suspected vulnerabilities through
+[GitHub private vulnerability reporting](https://github.com/ArkGravity/burrow/security/advisories/new);
+see the [security policy](https://github.com/ArkGravity/burrow/blob/@VERSION@/SECURITY.md).

@@ -11,6 +11,10 @@ verify pull requests and publish development images from `main`.
    version: the published `v0.1.0` is amd64-only and must not be replaced.
    `docs/releases/INSTALL.md` is a template; packaging replaces `@VERSION@`
    with the selected tag in every archive and the attached installation guide.
+   Keep the readable [installation guide](../installation.md), its
+   [Chinese translation](../installation_zh.md) and the README quick-start examples
+   aligned when installation changes. README release navigation uses the Releases
+   page; runnable examples deliberately pin a version.
 2. Merge release preparation into `main` through the required `verify` check and
    wait for its push CI, including image publication, to succeed. Main CI reuses
    full PR regression only when its recorded tested tree matches main exactly;

@@ -1,9 +1,17 @@
 # Documentation
 
-Start with the root [README](../README.md) for local development, common Make
-targets and Docker Compose deployment.
+Start with the root [README](../README.md) for the product overview, installation
+and application onboarding.
 
 A [Simplified Chinese introduction and setup guide](../README_zh.md) is also available.
+
+## Getting started
+
+- [Installation and first login](installation.md) · [简体中文](installation_zh.md)
+- [Local development, builds and checks](development/getting-started.md)
+- [Contributing](../CONTRIBUTING.md)
+- [Private vulnerability reporting](../SECURITY.md)
+- [Independent Web and SPA clients](../examples/README.md)
 
 ## Development
 
@@ -13,11 +21,10 @@ A [Simplified Chinese introduction and setup guide](../README_zh.md) is also ava
 - [Dependencies and implementation layout](development/dependencies.md)
 - [CI checks and image publishing](development/ci.md)
 - [Version release preparation and publication](development/releases.md)
-- [Release installation instructions](releases/INSTALL.md)
+- [Release installation template](releases/INSTALL.md) (rendered for each release)
 - [Seed and default role boundaries](development/seed.md)
 - [OIDC adapter boundaries](development/oidc-adapter.md)
 - [Mandatory MFA and account recovery](development/mfa-proposal.md)
-- [Independent Web and SPA clients](../examples/README.md)
 
 ## Operations and verification
 

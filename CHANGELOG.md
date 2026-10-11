@@ -1,5 +1,18 @@
 # Changelog
 
+## v0.1.4 (release preparation)
+
+- Reorganize both READMEs around installation, first login and application access;
+  keep a compact set of CI, release, Go and license badges.
+- Add readable English and Chinese installation guides, a source-development
+  guide, contribution instructions and a private vulnerability reporting policy.
+  Synchronize document navigation and the release installation template.
+- Align the Go module and internal imports with `github.com/ArkGravity/burrow`
+  and remove unused dependency declarations and checksum entries.
+
+See [v0.1.4 release notes](docs/releases/v0.1.4.md). Authentication behavior,
+schema v5 and the global MFA policy are unchanged; MFA remains disabled by default.
+
 ## v0.1.3 (2026-10-09)
 
 Published as [Burrow v0.1.3](https://github.com/ArkGravity/burrow/releases/tag/v0.1.3).
