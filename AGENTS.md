@@ -26,9 +26,8 @@ Bun, React, TypeScript, Ant Design and Vite. Use the versions declared in
 `go.mod`, package manifests, lockfiles and CI; update related declarations
 together when changing toolchains or dependencies.
 
-The Go module is currently `github.com/logic3579/burrow`, although the repository
-is hosted at `ArkGravity/burrow`. Preserve existing imports unless a module
-migration is explicitly part of the task.
+The Go module is `github.com/ArkGravity/burrow`, matching the repository host.
+Keep internal imports consistent with this module path.
 
 | Location                                          | Responsibility                                                                    |
 | ------------------------------------------------- | --------------------------------------------------------------------------------- |
@@ -299,6 +298,10 @@ messages. Never force-push or discard unrelated changes without authorization.
 ## References
 
 - [README and common commands](README.md)
+- [Installation and first login](docs/installation.md)
+- [Local development, builds and checks](docs/development/getting-started.md)
+- [Contributing](CONTRIBUTING.md)
+- [Private vulnerability reporting](SECURITY.md)
 - [Documentation index](docs/README.md)
 - [Configuration reference](docs/development/configuration.md)
 - [Seed and role boundaries](docs/development/seed.md)

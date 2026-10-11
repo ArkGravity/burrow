@@ -12,8 +12,8 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/logic3579/burrow/internal/burrow"
-	"github.com/logic3579/burrow/web"
+	"github.com/ArkGravity/burrow/internal/burrow"
+	"github.com/ArkGravity/burrow/web"
 )
 
 // Set by release builds; ordinary go run/build retains development defaults.

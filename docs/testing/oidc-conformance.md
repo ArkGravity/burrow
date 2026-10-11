@@ -1,5 +1,13 @@
 # 协议与回归验证记录
 
+## 2026-10-11：v0.1.4 发布准备与文档同步
+
+- 用户授权全面同步文档并发布新版本。中英文 README、可浏览的安装指南、开发指南、贡献指南、安全政策、文档索引、CI 部署入口和发布包安装模板已同步；活动安装示例与前端版本为 v0.1.4，历史版本记录保留原样。
+- Go 模块及三处内部导入统一为 `github.com/ArkGravity/burrow`，清理未使用的依赖记录；认证行为、schema v5 和 MFA 默认关闭策略没有变化。仓库 GitHub 私密漏洞报告已启用，API 回读确认 `enabled=true`。
+- 全仓 31 份 Markdown 的 185 个本地链接、资源与锚点，以及 43 段 shell 示例语法检查通过；Prettier、`git diff --check` 和 `go mod tidy -diff` 通过。
+- 本次本地运行 29 项 release 脚本测试、13 项 CI 脚本测试、前端 typecheck 和 2 项单元测试，全部通过。`make build VERSION=v0.1.4` 与静默 Compose 配置检查通过；五条浏览器/MFA/Web/SPA OIDC 回归使用该本地构建二进制运行，全部通过。构建使用本机 Go 1.27.2、Bun 1.4.3，远程流程仍使用仓库固定版本 Go 1.27.1、Bun 1.4.2。
+- 本地验证不是 Linux 发布产物验收。发布仍需精确主分支提交的 CI 与双架构 Release 工作流成功；实际发布状态与附件、镜像复核结果将在完成后另行记录。本次没有部署生产或重新验收 Grafana、Nightingale、Harbor，不代表官方 OIDC 认证。
+
 ## 2026-10-09：v0.1.3 正式发布
 
 - 用户已验收 CI/release 优化及 Users 操作调整，并授权创建 PR、合并和发布。[PR #6](https://github.com/ArkGravity/burrow/pull/6) 包含两个已验收提交及版本准备，经[完整 PR CI](https://github.com/ArkGravity/burrow/actions/runs/37968041395) 全部通过后 squash 合并到 `90050e1b0595ea78fde8ce92eccc0f1a98c1d1be`。原生 amd64/arm64 的 SQLite/PostgreSQL race、浏览器及镜像构建均通过，前端、静态分析、13 项 CI 和 29 项 release 脚本测试成功。

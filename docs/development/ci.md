@@ -125,7 +125,7 @@ Rebuilding jobs replace their own named artifacts on retry. PR verification reco
 also replace the previous attempt's record, and main validates the run attempt.
 
 Set `BURROW_IMAGE` in the deployment's untracked `.env.prod` to the desired tag
-or digest, then follow the [root deployment instructions](../../README.md#containers-and-deployment)
+or digest, then follow the [installation guide](../installation.md#docker-compose)
 to pull the image and run migration, seed and server. CI publishes images;
 deployments remain explicit. Preserve the database and original master key when
 upgrading.
