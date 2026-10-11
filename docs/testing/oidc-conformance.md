@@ -1,5 +1,15 @@
 # 协议与回归验证记录
 
+## 2026-10-12：v0.1.4 正式发布
+
+- [PR #8](https://github.com/ArkGravity/burrow/pull/8) 经[完整 PR CI](https://github.com/ArkGravity/burrow/actions/runs/38177847419) 通过后 squash 合并到 `f86a9d2e03da2b0c74e74e19071ac6c25195fe94`。原生 amd64/arm64 的 SQLite/PostgreSQL race、浏览器、镜像构建，以及前端与静态检查均通过。
+- [该提交的 main push CI](https://github.com/ArkGravity/burrow/actions/runs/38178357154) 全部成功。日志确认 PR 的测试 tree 与 main 完全一致，因此复用完整回归；两个原生镜像仍通过 PostgreSQL 生产启动烟测及双仓库发布。随后在此精确提交创建并推送 annotated tag `v0.1.4`。
+- [Release 工作流](https://github.com/ArkGravity/burrow/actions/runs/38178623448) 的 validate、两个原生 prepare 和 draft 全部成功。两个架构均对镜像中提取、打包后的实际二进制运行五条 SQLite/MFA/OIDC 浏览器回归；同一容器通过 PostgreSQL migrate、重复 seed、生产启动、readiness、healthcheck 和内嵌 UI 烟测。发布复用测试镜像，没有重新构建。
+- 六个附件全部下载复核，与 GitHub API 的 SHA256 摘要一致，SHA256SUMS 覆盖另外五个附件。检查两个 ELF 架构、执行权限、Go 1.27.1、模块路径 `github.com/ArkGravity/burrow`、CGO/内嵌前端及嵌入的版本和提交字符串；实际 `version` 命令验收来自两个原生任务，本机没有执行 Linux 二进制。MIT、默认配置、版本化安装说明及部署包内容正确，Compose 与源码逐字节一致，部署镜像固定 v0.1.4。
+- 独立匿名复核 GHCR 和 Docker Hub 的版本镜像，恰好包含 `linux/amd64` 和 `linux/arm64`；两仓库共同 index digest 为 `sha256:9066570dbd3a71d136f55b2a9ce65b4b34e2b8fefb9fa6397183683400e9f2b2`，amd64 为 `sha256:66f68af17cc712618849a04c09a29d8c7a48e82ed308a15ac5ef71045a49b209`，arm64 为 `sha256:5707d430c2704b01eb0386bf80a6f25ea245de46a2c4b14fb52afaa942079ae1`。平台 manifest、配置 blob 摘要与版本/提交标签均一致。
+- [Burrow v0.1.4](https://github.com/ArkGravity/burrow/releases/tag/v0.1.4) 于 `2026-10-11T22:08:43Z` 正式发布（Europe/Belgrade 为 2026-10-12）。API 确认 `draft=false`、`prerelease=false`、Latest 为 v0.1.4，六个附件均 uploaded。中英文文档、安装模板和活动示例已同步；GitHub 私密漏洞报告已启用。发布状态使用独立文档提交回写，版本 tag 与历史发布产物保持不变。
+- 认证行为、schema v5 和 MFA 默认关闭策略没有变化。本次没有部署生产或重新验收 Grafana、Nightingale、Harbor，不代表官方 OIDC 认证。
+
 ## 2026-10-11：v0.1.4 发布准备与文档同步
 
 - 用户授权全面同步文档并发布新版本。中英文 README、可浏览的安装指南、开发指南、贡献指南、安全政策、文档索引、CI 部署入口和发布包安装模板已同步；活动安装示例与前端版本为 v0.1.4，历史版本记录保留原样。

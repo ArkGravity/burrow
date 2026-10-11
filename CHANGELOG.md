@@ -1,6 +1,8 @@
 # Changelog
 
-## v0.1.4 (release preparation)
+## v0.1.4 (2026-10-12)
+
+Published as [Burrow v0.1.4](https://github.com/ArkGravity/burrow/releases/tag/v0.1.4).
 
 - Reorganize both READMEs around installation, first login and application access;
   keep a compact set of CI, release, Go and license badges.
