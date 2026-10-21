@@ -1,11 +1,19 @@
 # 协议与回归验证记录
 
-## 2026-10-21：主分支镜像发布校验修复（本地验证）
+## 2026-10-21：v1.0.0 发布准备
+
+- 按用户确认的流程，先同步版本、安装/升级指南、发布说明和项目约定，再通过普通准备 PR 合入 main；不维护 `release/v1.0.0` 分支。仅在精确 main 提交的完整 push CI 成功后创建 annotated tag，核验 Release 工作流、附件和双仓库镜像后再正式发布。
+- 前端版本与安装示例统一为 v1.0.0，页脚改为读取 `web/package.json`；补充 schema v6、SAML 证书维护、旧会话重新认证和备份回滚要求。历史发布与用户验收记录保留，不提前宣称 v1.0.0 已发布。
+- 当前会话没有可用的 Mem0 工具，准备阶段的长期决策写入项目约定与发布文档；未声称已同步 Mem0。正式发布结果待验证成功后另行记录。
+- 本地前端类型检查与 11 项单元测试、冻结锁文件安装、静默 Compose 校验通过；检查了 141 个本地/版本化源码引用和 30 段 shell 示例，Prettier 与 diff 检查通过。Linux 实际产物仍须由原生 Release 工作流验证。
+
+## 2026-10-21：主分支镜像发布校验修复（本地与远端验证）
 
 - SAML 和 UI 两个 PR 的完整 CI 均成功；合并后的主分支运行 [39596369955](https://github.com/ArkGravity/burrow/actions/runs/39596369955) 和 [39596434022](https://github.com/ArkGravity/burrow/actions/runs/39596434022) 均通过双架构镜像构建、PostgreSQL 生产启动烟测与汇总检查，并按精确 tree 复用对应 PR 回归。失败发生在镜像发布阶段的配置摘要比较。
 - 发布脚本将 `docker image inspect` 的 `.Id` 当作配置摘要，但 [Moby 的 containerd 实现](https://github.com/moby/moby/blob/master/daemon/containerd/image_inspect.go) 可返回 manifest/index 的摘要。下载最新失败运行的 amd64 镜像归档，确认其配置字节摘要与 GHCR 上已上传 manifest 的配置摘要一致；归档的 `crane digest` 也与上传的 manifest 摘要一致。
 - 在 `fix/image-publication-config-digest` 分支改为计算已测试归档内配置字节的 SHA256，保留架构、提交、远端配置、平台摘要、匿名访问和双仓库 index 一致性校验，并补充配置摘要不匹配时的错误信息。新增 containerd 场景在修复前失败、修复后通过；同时覆盖旧式配置文件名和配置缺失/多镜像归档的拒绝行为。
-- 本地 32 项发布脚本测试和 13 项 CI 脚本测试全部通过，Shell 语法与 diff 检查通过。此次没有重建或导入 Docker 镜像，也没有重复运行产品回归或执行远端发布；修复后的 GitHub CI 尚待提交推送后验证。
+- 本地 32 项发布脚本测试和 13 项 CI 脚本测试全部通过，Shell 语法与 diff 检查通过。诊断与本地验证没有重建或导入 Docker 镜像，也没有重复运行产品回归或执行远端发布。
+- 随后 [PR #12](https://github.com/ArkGravity/burrow/pull/12) 的[完整 CI](https://github.com/ArkGravity/burrow/actions/runs/39600223430) 全部成功，合并到 `eca0004f5a974f783e905a61bae6538fd48d1f01`。[该提交的 main CI](https://github.com/ArkGravity/burrow/actions/runs/39601426649) 全部成功，包含双架构生产启动烟测与实际双仓库镜像发布。独立匿名读取两个 `main-eca0004` 镜像，确认恰好包含 linux/amd64、linux/arm64，配置中的提交标识正确，两仓库共同 index digest 为 `sha256:ad954283a781ce81c5992519e063dd6a0f6088915c83e24f3ffb04e23beb58e2`，两个平台摘要也一致；原失败步骤实际通过。
 - 按用户要求已删除 local-sso 的 8 个容器、4 个数据卷及网络，并清理本次测试使用的 15 个镜像引用（11 个镜像）；Rancher 等无关镜像保留。旧本地分支已清理，随后为本次 CI 修复新建独立分支；远端分支、源码和截图保留。
 
 ## 2026-10-21：三平台接入与 UI 截图更新

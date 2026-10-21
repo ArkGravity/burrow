@@ -210,12 +210,23 @@ when using local overrides. Inspect `make help` for available actions.
 - Keep the native SVG brand asset in `web/public/logo.svg`; the favicon and
   `BrandMark` component share it. The signed-in sidebar has one top brand entry,
   linking to the portal, and retains the mark when collapsed on narrow screens.
+- Derive the UI footer version from `web/package.json`; do not maintain a second
+  hard-coded display version.
+- Release preparation uses an ordinary short-lived PR; a `release/vX.Y.Z` branch
+  is not required. Synchronize versions, installation/upgrade documentation and
+  project conventions before tagging. Only tag an exact main commit whose full
+  push CI, including image publication, succeeded. Validate the release workflow,
+  attachments and public image digests before publishing its draft; never move
+  published tags or replace historical assets. See `docs/development/releases.md`.
 
 ## Local SSO integrations
 
 - On 2026-10-21, the user reported successful manual local integration of Grafana
   and Nightingale through OIDC and Jenkins through SAML using the current guides.
   Preserve this checkpoint separately from automated tests, CI and production validation.
+- This October 21 acceptance environment was subsequently removed at the user's
+  request: its containers, data volumes, network and test images were deleted.
+  Source and screenshots remain; a fresh setup needs new accounts and SSO configuration.
 - The user reported successful local OIDC web-login acceptance for Grafana,
   Nightingale and Harbor on 2026-10-01. Keep this user-reported checkpoint distinct
   from automated checks, production validation and official OIDC certification.

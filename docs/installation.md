@@ -15,7 +15,7 @@ binary archive for your architecture, together with `SHA256SUMS`, `IMAGES.txt`
 and the release's `INSTALL.md`. The latter contains instructions rendered for
 that exact version. Use the same version for all downloaded files.
 
-The examples below pin `v0.1.4`. Replace this value when deliberately selecting
+The examples below pin `v1.0.0`. Replace this value when deliberately selecting
 another release; keep its image tag or digest pinned. This guide describes the
 amd64/arm64 release layout; historical v0.1.0 is amd64-only and has its own
 attached installation instructions.
@@ -34,11 +34,11 @@ index and platform digests.
 
 ## Docker Compose
 
-Install Docker Engine and Compose v2. Download `burrow_v0.1.4_deploy.tar.gz`,
+Install Docker Engine and Compose v2. Download `burrow_v1.0.0_deploy.tar.gz`,
 then extract the archive and enter its directory:
 
 ```bash
-BURROW_RELEASE=v0.1.4
+BURROW_RELEASE=v1.0.0
 tar -xzf "burrow_${BURROW_RELEASE}_deploy.tar.gz"
 cd "burrow_${BURROW_RELEASE}_deploy"
 cp .env.example .env
@@ -65,8 +65,8 @@ loopback port 8080 and preserve the browser Origin. Configure only actual truste
 proxy CIDRs. The issuer must match the public URL used by browsers and OIDC
 clients. PostgreSQL is not published to the host by the bundled Compose file.
 
-The archive selects `ghcr.io/arkgravity/burrow:v0.1.4`; the same version is
-available from `docker.io/logic3579/burrow:v0.1.4`. Docker selects Linux amd64 or
+The archive selects `ghcr.io/arkgravity/burrow:v1.0.0`; the same version is
+available from `docker.io/logic3579/burrow:v1.0.0`. Docker selects Linux amd64 or
 arm64 automatically. The deployment archive uses the canonical root
 [docker-compose.yml](../docker-compose.yml) and contains no Dockerfile.
 
@@ -107,8 +107,8 @@ roles and downstream applications after sign-in.
 
 ## Standalone Linux binary
 
-Choose `burrow_v0.1.4_linux_amd64.tar.gz` for x86-64 or
-`burrow_v0.1.4_linux_arm64.tar.gz` for AArch64. The binaries require glibc 2.36+
+Choose `burrow_v1.0.0_linux_amd64.tar.gz` for x86-64 or
+`burrow_v1.0.0_linux_arm64.tar.gz` for AArch64. The binaries require glibc 2.36+
 (for example Debian 12); Alpine/musl and older glibc are not supported.
 Extract the selected archive, enter its directory and copy the configuration:
 
@@ -148,8 +148,14 @@ database's signing keys or TOTP secrets.
 
 Back up before upgrading, read the selected release notes, stop the old server,
 select the new image or binary, then run migration and seed before starting it.
-Recheck administrator and downstream OIDC login afterward. A database migration
+Recheck administrator and configured downstream OIDC/SAML login afterward. A database migration
 cannot be rolled back merely by choosing an older image.
+
+v1.0.0 uses schema v6. Upgrading from v0.1.x applies migration 006, preserving
+existing OIDC data, grants and keys while initializing independent encrypted SAML
+signing keys. Older sessions may need fresh authentication for SAML. A binary
+requiring schema v5 cannot use the upgraded database; rollback requires the
+pre-upgrade backup. See [SAML certificate recovery and Jenkins trust updates](operations/recovery.md#saml-证书与-schema-v6).
 
 Versions v0.1.0 and v0.1.1 required MFA; v0.1.2 and later default to disabling it.
 Explicitly enable the MFA policy before starting a newer release if you want to

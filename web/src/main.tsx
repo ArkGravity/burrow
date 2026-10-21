@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useState } from "react";
 import ReactDOM from "react-dom/client";
+import { version } from "../package.json";
 import {
   BrowserRouter,
   Navigate,
@@ -217,7 +218,7 @@ function Shell() {
         </main>
         <footer className="workspace-footer">
           {t("footer")}
-          <span>v0.1</span>
+          <span>v{version}</span>
         </footer>
       </div>
     </div>

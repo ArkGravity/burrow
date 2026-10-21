@@ -11,7 +11,7 @@
 Compose 下载部署包，原生运行下载对应架构的二进制包，同时下载同版本的
 `SHA256SUMS`、`IMAGES.txt` 和 `INSTALL.md`。附件中的安装指南已经渲染为该版本的具体步骤。
 
-本文示例固定 `v0.1.4`，选择其他版本时统一替换版本值，并固定镜像 tag 或摘要。
+本文示例固定 `v1.0.0`，选择其他版本时统一替换版本值，并固定镜像 tag 或摘要。
 本文使用 amd64/arm64 发布布局；历史 v0.1.0 仅支持 amd64，请按该版本的安装附件操作。
 
 在使用 GNU coreutils 的 Linux 上，解压前执行：
@@ -27,10 +27,10 @@ sha256sum --ignore-missing --check SHA256SUMS
 
 ## Docker Compose
 
-准备 Docker Engine 和 Compose v2，下载 `burrow_v0.1.4_deploy.tar.gz` 后解压：
+准备 Docker Engine 和 Compose v2，下载 `burrow_v1.0.0_deploy.tar.gz` 后解压：
 
 ```bash
-BURROW_RELEASE=v0.1.4
+BURROW_RELEASE=v1.0.0
 tar -xzf "burrow_${BURROW_RELEASE}_deploy.tar.gz"
 cd "burrow_${BURROW_RELEASE}_deploy"
 cp .env.example .env
@@ -56,8 +56,8 @@ openssl rand -hex 24    # 初始管理员密码
 只信任实际使用的代理 CIDR，issuer 必须与浏览器和 OIDC 客户端访问的公开地址一致。
 内置 Compose 不向宿主机暴露 PostgreSQL 端口。
 
-部署包使用 `ghcr.io/arkgravity/burrow:v0.1.4`，同版本也可从
-`docker.io/logic3579/burrow:v0.1.4` 获取。Docker 自动选择 Linux amd64 或 arm64。
+部署包使用 `ghcr.io/arkgravity/burrow:v1.0.0`，同版本也可从
+`docker.io/logic3579/burrow:v1.0.0` 获取。Docker 自动选择 Linux amd64 或 arm64。
 部署包使用根目录的 [docker-compose.yml](../docker-compose.yml)，不包含 Dockerfile。
 
 ```bash
@@ -92,8 +92,8 @@ docker compose --profile local-db up -d --no-build --pull never --force-recreate
 
 ## 独立 Linux 二进制
 
-x86-64 选择 `burrow_v0.1.4_linux_amd64.tar.gz`，AArch64 选择
-`burrow_v0.1.4_linux_arm64.tar.gz`。二进制要求 glibc 2.36+，例如 Debian 12；
+x86-64 选择 `burrow_v1.0.0_linux_amd64.tar.gz`，AArch64 选择
+`burrow_v1.0.0_linux_arm64.tar.gz`。二进制要求 glibc 2.36+，例如 Debian 12；
 不支持 Alpine/musl 或更旧的 glibc。解压后进入对应目录并复制配置：
 
 ```bash
@@ -126,7 +126,12 @@ docker compose --profile local-db down
 需要保留数据时不要使用 `down --volumes`。新主密钥无法解密已有数据库中的签名密钥或 TOTP 密钥。
 
 升级前备份并阅读目标版本说明，停止旧服务，选择新镜像或二进制，依次执行迁移、初始化和服务启动。
-之后重新验证管理员与下游 OIDC 登录。切换旧镜像不能直接回滚数据库迁移。
+之后重新验证管理员与已配置的下游 OIDC/SAML 登录。切换旧镜像不能直接回滚数据库迁移。
+
+v1.0.0 使用 schema v6。从 v0.1.x 升级会应用迁移 006，保留已有 OIDC 数据、授权和密钥，
+并初始化独立加密的 SAML 签名密钥。旧会话使用 SAML 时可能需要重新认证。
+迁移完成后旧版二进制不能直接使用 v6 数据库，回滚需恢复升级前备份；
+SAML 证书维护与 Jenkins 信任更新见[恢复指南](operations/recovery.md#saml-证书与-schema-v6)。
 
 v0.1.0/v0.1.1 强制 MFA，v0.1.2 及以后默认关闭；要保留原有 MFA 要求，需在新版启动前显式开启。
 旧 Provider 数据库升级前必须满足密码认证迁移的前置要求。

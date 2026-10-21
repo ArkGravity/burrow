@@ -61,7 +61,7 @@ Docker Engine and Compose v2, then download the deployment archive from
 [Releases](https://github.com/ArkGravity/burrow/releases). This example pins a release:
 
 ```bash
-BURROW_RELEASE=v0.1.4
+BURROW_RELEASE=v1.0.0
 tar -xzf "burrow_${BURROW_RELEASE}_deploy.tar.gz"
 cd "burrow_${BURROW_RELEASE}_deploy"
 cp .env.example .env

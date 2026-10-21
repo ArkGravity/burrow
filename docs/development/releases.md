@@ -6,8 +6,14 @@ verify pull requests and publish development images from `main`.
 
 ## Preparing a version
 
+Release identity comes from an annotated tag on a verified main commit. A
+long-lived or specially named `release/vX.Y.Z` branch is not required: use an
+ordinary short-lived preparation PR, then tag main after its exact commit passes
+CI. Keep historical version tags and attachments unchanged.
+
 1. Add `docs/releases/vX.Y.Z.md`, update the changelog and installation examples,
-   and keep manifest versions aligned where applicable. Select a new stable
+   and keep manifest versions aligned where applicable. The signed-in UI footer
+   reads its version from `web/package.json`. Select a new stable
    version: the published `v0.1.0` is amd64-only and must not be replaced.
    `docs/releases/INSTALL.md` is a template; packaging replaces `@VERSION@`
    with the selected tag in every archive and the attached installation guide.
@@ -15,6 +21,9 @@ verify pull requests and publish development images from `main`.
    [Chinese translation](../installation_zh.md) and the README quick-start examples
    aligned when installation changes. README release navigation uses the Releases
    page; runnable examples deliberately pin a version.
+   Synchronize durable project conventions before release. Memory synchronization
+   records intended boundaries before publication and verified results afterward;
+   it is not a release gate, and unavailable memory tools must be reported accurately.
 2. Merge release preparation into `main` through the required `verify` check and
    wait for its push CI, including image publication, to succeed. Main CI reuses
    full PR regression only when its recorded tested tree matches main exactly;
