@@ -90,7 +90,7 @@ test("administrator provisions access and ordinary users see only their portal",
     page.getByRole("heading", { name: "Your work starts here." }),
   ).not.toBeVisible();
   await expect(
-    page.getByRole("heading", { name: "Your workspace, connected." }),
+    page.getByRole("heading", { name: "Your applications" }),
   ).toBeVisible();
   await expect(
     page.getByRole("link", { name: "Providers", exact: true }),
@@ -255,7 +255,7 @@ test("independent Web and SPA OIDC clients share SSO and complete RP logout", as
   await page.getByRole("button", { name: "Sign in", exact: true }).click();
   await completeMFA(page, adminSecret);
   await expect(
-    page.getByRole("heading", { name: "Your workspace, connected." }),
+    page.getByRole("heading", { name: "Your applications" }),
   ).toBeVisible();
   const csrf = (await (await page.request.get("/api/v1/auth/csrf")).json())
     .token;
@@ -376,7 +376,7 @@ test("administrator enables PKCE compatibility for an independent Web client", a
   await page.getByRole("button", { name: "Sign in", exact: true }).click();
   await completeMFA(page, adminSecret);
   await expect(
-    page.getByRole("heading", { name: "Your workspace, connected." }),
+    page.getByRole("heading", { name: "Your applications" }),
   ).toBeVisible();
   await page.getByRole("link", { name: "Applications", exact: true }).click();
   await page.getByRole("button", { name: "Create", exact: true }).click();
@@ -466,7 +466,7 @@ test("expired enrollment, administrator reset and CLI recovery require password 
   await page.getByRole("button", { name: "Sign in", exact: true }).click();
   await completeMFA(page, adminSecret);
   await expect(
-    page.getByRole("heading", { name: "Your workspace, connected." }),
+    page.getByRole("heading", { name: "Your applications" }),
   ).toBeVisible();
   const csrf = (await (await page.request.get("/api/v1/auth/csrf")).json())
     .token;
@@ -530,7 +530,7 @@ test("expired enrollment, administrator reset and CLI recovery require password 
     await changePassword("Changed-recovery-password-2026");
     let secret = await completeMFA(target);
     await expect(
-      target.getByRole("heading", { name: "Your workspace, connected." }),
+      target.getByRole("heading", { name: "Your applications" }),
     ).toBeVisible();
     await page.getByRole("link", { name: "Users", exact: true }).click();
     await expect(
@@ -557,7 +557,7 @@ test("expired enrollment, administrator reset and CLI recovery require password 
     expect(newSecret).not.toBe(secret);
     secret = newSecret;
     await expect(
-      target.getByRole("heading", { name: "Your workspace, connected." }),
+      target.getByRole("heading", { name: "Your applications" }),
     ).toBeVisible();
     await page
       .getByRole("row")
@@ -576,7 +576,7 @@ test("expired enrollment, administrator reset and CLI recovery require password 
     await completeMFA(target, secret);
     await changePassword("Final-recovery-password-2026");
     await expect(
-      target.getByRole("heading", { name: "Your workspace, connected." }),
+      target.getByRole("heading", { name: "Your applications" }),
     ).toBeVisible();
     execFileSync(
       process.env.BURROW_E2E_BINARY!,

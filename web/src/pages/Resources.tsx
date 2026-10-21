@@ -19,7 +19,6 @@ import {
 import {
   PlusOutlined,
   ReloadOutlined,
-  SearchOutlined,
   EditOutlined,
   DeleteOutlined,
   KeyOutlined,
@@ -56,12 +55,8 @@ const shared: Field[] = [
   { key: "name", label: "name", required: true },
   { key: "description", label: "description" },
 ];
-const definitions: Record<
-  string,
-  { subtitle: TranslationKey; permission: string; fields: Field[] }
-> = {
+const definitions: Record<string, { permission: string; fields: Field[] }> = {
   users: {
-    subtitle: "manageUsers",
     permission: "users:write",
     fields: [
       { key: "username", label: "username", required: true, createOnly: true },
@@ -80,7 +75,6 @@ const definitions: Record<
     ],
   },
   groups: {
-    subtitle: "manageGroups",
     permission: "groups:write",
     fields: [
       ...shared,
@@ -89,7 +83,6 @@ const definitions: Record<
     ],
   },
   roles: {
-    subtitle: "manageRoles",
     permission: "authorization:write",
     fields: [
       ...shared,
@@ -102,12 +95,10 @@ const definitions: Record<
     ],
   },
   permissions: {
-    subtitle: "managePermissions",
     permission: "authorization:write",
     fields: [],
   },
   applications: {
-    subtitle: "manageApplications",
     permission: "applications:write",
     fields: [
       { key: "name", label: "name", required: true },
@@ -322,9 +313,13 @@ export function Resources({ resource }: { resource: string }) {
       render: (_: unknown, row: Row) => (
         <div className="record-name">
           <span className="record-avatar">
-            {String(row.name || row.username || row.id)
-              .slice(0, 1)
-              .toUpperCase()}
+            {resource === "applications" && row.icon ? (
+              <img src={String(row.icon)} alt="" referrerPolicy="no-referrer" />
+            ) : (
+              String(row.name || row.username || row.id)
+                .slice(0, 1)
+                .toUpperCase()
+            )}
           </span>
           <div>
             <strong>
@@ -349,6 +344,20 @@ export function Resources({ resource }: { resource: string }) {
         </div>
       ),
     },
+    ...(resource === "applications"
+      ? [
+          {
+            title: t("protocol"),
+            key: "protocol",
+            width: 110,
+            render: (_: unknown, row: Row) => (
+              <Tag color={row.protocol === "saml" ? "purple" : "blue"}>
+                {row.protocol === "saml" ? "SAML" : "OIDC"}
+              </Tag>
+            ),
+          },
+        ]
+      : []),
     ...(resource === "users"
       ? [
           { title: t("email"), dataIndex: "email", key: "email" },
@@ -376,6 +385,48 @@ export function Resources({ resource }: { resource: string }) {
           },
         ]
       : []),
+    ...(resource === "groups"
+      ? [
+          {
+            title: t("memberCount"),
+            key: "members",
+            dataIndex: "userIds",
+            width: 130,
+            render: (ids: unknown) => (Array.isArray(ids) ? ids.length : "—"),
+          },
+          {
+            title: t("roleCount"),
+            key: "roles",
+            dataIndex: "roleIds",
+            width: 130,
+            render: (ids: unknown) => (Array.isArray(ids) ? ids.length : "—"),
+          },
+        ]
+      : []),
+    ...(resource === "roles"
+      ? [
+          {
+            title: t("permissionCount"),
+            key: "permissions",
+            width: 180,
+            render: (_: unknown, row: Row) =>
+              row.builtin
+                ? "—"
+                : Array.isArray(row.permissionIds)
+                  ? row.permissionIds.length
+                  : "—",
+          },
+        ]
+      : []),
+    ...(resource === "permissions"
+      ? [
+          {
+            title: t("description"),
+            key: "description",
+            dataIndex: "description",
+          },
+        ]
+      : []),
     ...(["users", "applications"].includes(resource)
       ? [
           {
@@ -394,7 +445,7 @@ export function Resources({ resource }: { resource: string }) {
           {
             title: t("actions"),
             key: "actions",
-            width: resource === "users" ? 180 : 210,
+            width: resource === "users" ? 160 : 136,
             render: (_: unknown, row: Row) => (
               <Space wrap size={4}>
                 <Button
@@ -474,26 +525,7 @@ export function Resources({ resource }: { resource: string }) {
   ];
   return (
     <>
-      <div className="page-heading">
-        <div>
-          <div className="eyebrow">
-            {t(resource === "applications" ? "connections" : "identity")}
-          </div>
-          <h1>{t(resource as TranslationKey)}</h1>
-          <p>{t(def.subtitle)}</p>
-        </div>
-        {writable && resource !== "permissions" && (
-          <Button
-            aria-label={t("create")}
-            type="primary"
-            size="large"
-            icon={<PlusOutlined />}
-            onClick={() => void open(null)}
-          >
-            {t("create")}
-          </Button>
-        )}
-      </div>
+      <h1 className="sr-only">{t(resource as TranslationKey)}</h1>
       {error && (
         <Alert
           showIcon
@@ -507,21 +539,35 @@ export function Resources({ resource }: { resource: string }) {
           <Input.Search
             aria-label={t("search")}
             placeholder={t("search")}
-            prefix={<SearchOutlined />}
             allowClear
             onSearch={(value) => {
               setPage(1);
               setSearch(value);
             }}
-            style={{ maxWidth: 340 }}
+            className="table-search"
           />
-          <Button
-            aria-label={t("refresh")}
-            icon={<ReloadOutlined />}
-            onClick={() => void load()}
-          />
+          <Space className="table-actions" size={8}>
+            {writable && resource !== "permissions" && (
+              <Button
+                aria-label={t("create")}
+                type="primary"
+                icon={<PlusOutlined />}
+                onClick={() => void open(null)}
+              >
+                {t("create")}
+              </Button>
+            )}
+            <Tooltip title={t("refresh")}>
+              <Button
+                aria-label={t("refresh")}
+                icon={<ReloadOutlined />}
+                onClick={() => void load()}
+              />
+            </Tooltip>
+          </Space>
         </div>
         <Table
+          size="middle"
           rowKey="id"
           loading={loading}
           dataSource={rows}

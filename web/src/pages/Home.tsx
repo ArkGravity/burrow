@@ -46,18 +46,6 @@ export function HomePage() {
   }, [session]);
   return (
     <>
-      <div className="page-heading home-heading">
-        <div>
-          <div className="eyebrow">
-            {t("welcome")}, {session?.user.name || session?.user.username}
-          </div>
-          <h1>{t("portal")}</h1>
-          <p>{t("portalSub")}</p>
-        </div>
-        <div className="home-stamp">
-          <span className="status-dot" /> OIDC · SSO
-        </div>
-      </div>
       {error && <Alert type="error" title={t(errorKey(error))} showIcon />}
       {loading ? (
         <Skeleton active />
@@ -91,13 +79,12 @@ export function HomePage() {
                     {x.icon}
                   </div>
                   <strong>{stats[x.key] ?? 0}</strong>
-                  <div className="stat-rule" />
                 </div>
               ))}
             </div>
           )}
-          <div className="section-heading">
-            <h2>{t("yourApps")}</h2>
+          <div className="section-heading portal-heading">
+            <h1>{t("yourApps")}</h1>
             <span className="count-badge">{apps.length}</span>
           </div>
           {apps.length === 0 ? (
@@ -112,32 +99,54 @@ export function HomePage() {
               />
             </div>
           ) : (
-            <div className="apps-grid">
-              {apps.map((app) => (
-                <a
-                  className="app-card"
-                  key={app.id}
-                  href={String(app.loginUrl)}
-                  target="_blank"
-                  rel="noopener noreferrer"
+            (["oidc", "saml"] as const).map((protocol) => {
+              const group = apps.filter((app) =>
+                protocol === "saml"
+                  ? app.protocol === "saml"
+                  : app.protocol !== "saml",
+              );
+              if (group.length === 0) return null;
+              return (
+                <section
+                  className="application-group"
+                  key={protocol}
+                  aria-labelledby={`${protocol}-applications`}
                 >
-                  <div className="app-icon">
-                    {app.icon ? (
-                      <img
-                        src={String(app.icon)}
-                        alt=""
-                        referrerPolicy="no-referrer"
-                      />
-                    ) : (
-                      <AppstoreOutlined />
-                    )}
+                  <div className="section-heading protocol-heading">
+                    <h2 id={`${protocol}-applications`}>
+                      {protocol.toUpperCase()}
+                    </h2>
+                    <span className="count-badge">{group.length}</span>
                   </div>
-                  <h3>{String(app.name)}</h3>
-                  <span>{t("openApp")}</span>
-                  <ArrowRightOutlined className="app-arrow" />
-                </a>
-              ))}
-            </div>
+                  <div className="apps-grid">
+                    {group.map((app) => (
+                      <a
+                        className="app-card"
+                        key={app.id}
+                        href={String(app.loginUrl)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >
+                        <div className="app-icon">
+                          {app.icon ? (
+                            <img
+                              src={String(app.icon)}
+                              alt=""
+                              referrerPolicy="no-referrer"
+                            />
+                          ) : (
+                            <AppstoreOutlined />
+                          )}
+                        </div>
+                        <h3>{String(app.name)}</h3>
+                        <span>{t("openApp")}</span>
+                        <ArrowRightOutlined className="app-arrow" />
+                      </a>
+                    ))}
+                  </div>
+                </section>
+              );
+            })
           )}
         </>
       )}
@@ -150,12 +159,7 @@ export function ProfilePage() {
   const { message } = App.useApp();
   return (
     <>
-      <div className="page-heading">
-        <div>
-          <div className="eyebrow">{t("workspace")}</div>
-          <h1>{t("profile")}</h1>
-        </div>
-      </div>
+      <h1 className="sr-only">{t("profile")}</h1>
       <div className="profile-grid">
         <Card title={t("detail")}>
           <Form

@@ -75,6 +75,14 @@ http://jenkins.yakir.top/securityRealm/commenceLogin?from=%2F
 
 上传或粘贴 Jenkins metadata，检查服务器提取的 Entity ID、ACS、公开签名证书。支持一个 POST ACS、一张 RSA 签名证书；若同一公钥另列 encryption descriptor，不会误算为第二张签名证书。无需 Client ID、Client Secret 或 PKCE 设置。
 
+应用的 Icon URL 可填写以下 Jenkins SVG 示例：
+
+```text
+http://jenkins.yakir.top/static/1ec166e9/images/svgs/logo.svg
+```
+
+`static/1ec166e9` 是当前 Jenkins 的静态资源版本路径；升级后若链接失效，从 Jenkins 页面复制新的 Logo 地址并更新应用图标。
+
 创建普通角色，授予 Jenkins 应用登录权限，再分配给上述两个 Burrow 用户或其用户组。Jenkins 的管理员/只读权限仍由它自己的 Matrix 配置决定，Burrow 不发送组、角色或管理员属性。
 
 ## 验收
