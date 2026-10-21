@@ -1,5 +1,13 @@
 # 协议与回归验证记录
 
+## 2026-10-21：主分支镜像发布校验修复（本地验证）
+
+- SAML 和 UI 两个 PR 的完整 CI 均成功；合并后的主分支运行 [39596369955](https://github.com/ArkGravity/burrow/actions/runs/39596369955) 和 [39596434022](https://github.com/ArkGravity/burrow/actions/runs/39596434022) 均通过双架构镜像构建、PostgreSQL 生产启动烟测与汇总检查，并按精确 tree 复用对应 PR 回归。失败发生在镜像发布阶段的配置摘要比较。
+- 发布脚本将 `docker image inspect` 的 `.Id` 当作配置摘要，但 [Moby 的 containerd 实现](https://github.com/moby/moby/blob/master/daemon/containerd/image_inspect.go) 可返回 manifest/index 的摘要。下载最新失败运行的 amd64 镜像归档，确认其配置字节摘要与 GHCR 上已上传 manifest 的配置摘要一致；归档的 `crane digest` 也与上传的 manifest 摘要一致。
+- 在 `fix/image-publication-config-digest` 分支改为计算已测试归档内配置字节的 SHA256，保留架构、提交、远端配置、平台摘要、匿名访问和双仓库 index 一致性校验，并补充配置摘要不匹配时的错误信息。新增 containerd 场景在修复前失败、修复后通过；同时覆盖旧式配置文件名和配置缺失/多镜像归档的拒绝行为。
+- 本地 32 项发布脚本测试和 13 项 CI 脚本测试全部通过，Shell 语法与 diff 检查通过。此次没有重建或导入 Docker 镜像，也没有重复运行产品回归或执行远端发布；修复后的 GitHub CI 尚待提交推送后验证。
+- 按用户要求已删除 local-sso 的 8 个容器、4 个数据卷及网络，并清理本次测试使用的 15 个镜像引用（11 个镜像）；Rancher 等无关镜像保留。旧本地分支已清理，随后为本次 CI 修复新建独立分支；远端分支、源码和截图保留。
+
 ## 2026-10-21：三平台接入与 UI 截图更新
 
 - 用户报告按 local-sso 文档成功接入 Grafana、Nightingale（OIDC）和 Jenkins（SAML），随后确认门户、管理页面与侧栏的 UI 优化需求已完成，并手动更新 `docs/screenshots/` 中的截图。

@@ -1,10 +1,13 @@
 """Exercise publication failures with fake Docker/crane CLIs; no registry writes."""
 
+import hashlib
+import io
 import json
 import os
 from pathlib import Path
 import subprocess
 import sys
+import tarfile
 import tempfile
 import unittest
 
@@ -19,7 +22,7 @@ scenario = os.environ.get("SCENARIO", "")
 with open(os.environ["DOCKER_LOG"], "a") as log:
     log.write(json.dumps({"tool": "docker", "args": args, "anonymous": bool(os.environ.get("DOCKER_CONFIG"))}) + "\n")
 def config(arch):
-    return "sha256:" + ("a" if arch == "amd64" else "b") * 64
+    return os.environ["CONFIG_DIGEST_" + arch.upper()]
 def digest(arch, hub=False):
     value = "c" if arch == "amd64" else "d"
     if scenario == "platform-digest-mismatch" and hub and arch == "arm64":
@@ -31,7 +34,8 @@ elif args[:2] == ["image", "inspect"]:
     arch = args[2].rsplit("-", 1)[1]
     actual_arch = "amd64" if scenario == "wrong-architecture" else arch
     commit = "wrong" if scenario == "wrong-commit" else os.environ["GITHUB_SHA"]
-    print(json.dumps({"Id": config(arch), "Os": "linux", "Architecture": actual_arch,
+    image_id = digest(arch) if scenario == "containerd-image-id" else config(arch)
+    print(json.dumps({"Id": image_id, "Os": "linux", "Architecture": actual_arch,
         "Config": {"Labels": {"org.opencontainers.image.revision": commit}}}))
 elif args[:3] == ["buildx", "imagetools", "create"]:
     assert len(args) == 7
@@ -102,15 +106,27 @@ class PublishImageTests(unittest.TestCase):
         self.directory = Path(self.temp.name)
         self.images = self.directory / "images"
         self.images.mkdir()
+        config_digests = {}
         for arch in ["amd64", "arm64"]:
-            (self.images / f"image-{arch}.tar").write_bytes(b"saved image fixture")
+            config = json.dumps({"os": "linux", "architecture": arch,
+                "config": {"Labels": {"org.opencontainers.image.revision": COMMIT}}}).encode()
+            digest = hashlib.sha256(config).hexdigest()
+            config_digests["CONFIG_DIGEST_" + arch.upper()] = "sha256:" + digest
+            config_path = f"blobs/sha256/{digest}"
+            manifest = json.dumps([{"Config": config_path, "RepoTags": [f"burrow:release-{arch}"],
+                                    "Layers": []}]).encode()
+            with tarfile.open(self.images / f"image-{arch}.tar", "w") as archive:
+                for name, content in [("manifest.json", manifest), (config_path, config)]:
+                    info = tarfile.TarInfo(name)
+                    info.size = len(content)
+                    archive.addfile(info, io.BytesIO(content))
         for name, mock in [("docker", MOCK_DOCKER), ("crane", MOCK_CRANE)]:
             executable = self.directory / name
             executable.write_text(f"#!{sys.executable}\n" + mock)
             executable.chmod(0o755)
         self.log = self.directory / "docker.log"
         self.output = self.directory / "IMAGES.txt"
-        self.env = {**os.environ, "PATH": str(self.directory) + os.pathsep + os.environ["PATH"],
+        self.env = {**os.environ, **config_digests, "PATH": str(self.directory) + os.pathsep + os.environ["PATH"],
                     "GITHUB_SHA": COMMIT, "GITHUB_REPOSITORY": "ArkGravity/burrow",
                     "DOCKERHUB_NAMESPACE": "logic3579", "DOCKER_LOG": str(self.log)}
         self.env.pop("DOCKER_CONFIG", None)
@@ -153,6 +169,37 @@ class PublishImageTests(unittest.TestCase):
         self.publish(tag="main-1111111", kind="ci")
         self.assertIn("burrow:ci-arm64", str(self.commands()))
         self.assertIn("burrow:main-1111111", self.output.read_text())
+
+    def test_containerd_image_id_is_not_used_as_the_config_digest(self):
+        for tag, kind in [("main-1111111", "ci"), ("v0.2.0", "release")]:
+            with self.subTest(kind=kind):
+                self.publish("containerd-image-id", tag=tag, kind=kind)
+                self.assertEqual(len(self.output.read_text().splitlines()), 6)
+
+    def test_legacy_archive_config_filename(self):
+        path = self.images / "image-amd64.tar"
+        with tarfile.open(path) as archive:
+            manifest = json.load(archive.extractfile("manifest.json"))
+            config = archive.extractfile(manifest[0]["Config"]).read()
+        manifest[0]["Config"] = self.env["CONFIG_DIGEST_AMD64"].removeprefix("sha256:") + ".json"
+        with tarfile.open(path, "w") as archive:
+            for name, content in [("manifest.json", json.dumps(manifest).encode()),
+                                  (manifest[0]["Config"], config)]:
+                info = tarfile.TarInfo(name)
+                info.size = len(content)
+                archive.addfile(info, io.BytesIO(content))
+        self.publish()
+
+    def test_ambiguous_or_missing_archive_config_prevents_any_registry_write(self):
+        for manifest in [[], [{"Config": "a"}, {"Config": "b"}], [{"Config": "missing.json"}]]:
+            with self.subTest(manifest=manifest):
+                content = json.dumps(manifest).encode()
+                with tarfile.open(self.images / "image-amd64.tar", "w") as archive:
+                    info = tarfile.TarInfo("manifest.json")
+                    info.size = len(content)
+                    archive.addfile(info, io.BytesIO(content))
+                self.publish(success=False)
+                self.assertFalse(any(c["args"][0] == "push" for c in self.commands()))
 
     def test_missing_image_prevents_any_registry_write(self):
         (self.images / "image-arm64.tar").unlink()
