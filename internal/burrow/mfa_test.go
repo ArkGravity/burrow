@@ -471,10 +471,10 @@ func TestMFAMigrationUpgrade(t *testing.T) {
 					t.Fatal(err)
 				}
 				session := Session{ID: "legacy", UserID: "legacy", CredentialHash: hash("legacy"), Method: "password", AuthTime: time.Now(), ExpiresAt: time.Now().Add(time.Hour)}
-				if err := s.DB.Omit("MFAAt", "AuthVersion").Create(&session).Error; err != nil {
+				if err := s.DB.Omit("MFAAt", "AuthVersion", "UTCTimestamps").Create(&session).Error; err != nil {
 					t.Fatal(err)
 				}
-				if err := s.DB.Create(&Application{ID: "legacy", ClientID: "legacy", Enabled: true}).Error; err != nil {
+				if err := s.DB.Omit("Protocol").Create(&Application{ID: "legacy", ClientID: "legacy", Enabled: true}).Error; err != nil {
 					t.Fatal(err)
 				}
 				if err := s.DB.Create(&TokenRecord{ID: "legacy", UserID: "legacy", ClientID: "legacy", SessionID: "legacy", ExpiresAt: session.ExpiresAt}).Error; err != nil {

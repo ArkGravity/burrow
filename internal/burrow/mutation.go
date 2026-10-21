@@ -47,7 +47,7 @@ func (b *Server) sessionDB(db *gorm.DB, r *http.Request) (User, Session, error) 
 	if e != nil {
 		return u, s, e
 	}
-	if e = db.Where("credential_hash = ? AND revoked = ? AND expires_at > ?", hash(c.Value), false, time.Now()).First(&s).Error; e != nil {
+	if e = b.liveSessions(db, time.Now()).Where("credential_hash = ?", hash(c.Value)).First(&s).Error; e != nil {
 		return u, s, e
 	}
 	if e = db.Where("id = ? AND enabled = ?", s.UserID, true).First(&u).Error; e != nil {
@@ -57,6 +57,23 @@ func (b *Server) sessionDB(db *gorm.DB, r *http.Request) (User, Session, error) 
 		return u, s, errors.New("invalid_authentication_method")
 	}
 	return u, s, nil
+}
+
+// PostgreSQL's historical TIMESTAMP columns store a wall clock. Keep old
+// sessions on their original comparison basis; new sessions explicitly use UTC.
+// SQLite retains offsets, so compare absolute instants instead of text order.
+func (s *Store) liveSessions(db *gorm.DB, now time.Time) *gorm.DB {
+	if s.Config.DBDriver == "sqlite" {
+		return db.Where("revoked = ? AND julianday(expires_at) > julianday(?)", false, now.UTC())
+	}
+	return db.Where("revoked = ? AND ((utc_timestamps = ? AND expires_at > ?) OR (utc_timestamps = ? AND expires_at > ?))", false, true, now.UTC(), false, now)
+}
+
+func (s *Store) legacyDatabaseTime(value time.Time) time.Time {
+	if s.Config.DBDriver != "postgres" {
+		return value
+	}
+	return time.Date(value.Year(), value.Month(), value.Day(), value.Hour(), value.Minute(), value.Second(), value.Nanosecond(), time.Local)
 }
 func mutationError(w http.ResponseWriter, r *http.Request, e error) {
 	status, code := 503, "unavailable"

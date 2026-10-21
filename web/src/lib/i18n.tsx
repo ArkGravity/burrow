@@ -1,6 +1,17 @@
 import { createContext, useContext } from "react";
 export type Language = "en" | "zh-CN";
 const en = {
+  protocol: "Protocol",
+  userId: "User ID",
+  oidcProtocol: "OpenID Connect",
+  samlProtocol: "SAML 2.0",
+  samlMetadataXml: "SP metadata XML",
+  samlUploadMetadata: "Choose metadata XML file",
+  samlMetadataHint:
+    "Upload or paste the service provider metadata. One POST ACS and one RSA signing certificate are supported. Register the displayed Burrow metadata in Jenkins.",
+  samlMetadataSize: "Choose a UTF-8 XML file up to 256 KiB.",
+  samlSigningCertificate: "SP signing certificate",
+  samlIdpMetadata: "Burrow IdP metadata",
   mfaBind: "Set up multi-factor authentication",
   mfaVerify: "Verify your identity",
   mfaBindHint:
@@ -149,6 +160,17 @@ const en = {
 } as const;
 type Key = keyof typeof en;
 const zh: Record<Key, string> = {
+  protocol: "协议",
+  userId: "用户 ID",
+  oidcProtocol: "OpenID Connect",
+  samlProtocol: "SAML 2.0",
+  samlMetadataXml: "SP metadata XML",
+  samlUploadMetadata: "选择 metadata XML 文件",
+  samlMetadataHint:
+    "上传或粘贴服务提供方 metadata。支持一个 POST ACS 和一张 RSA 签名证书；在 Jenkins 中配置下方 Burrow metadata。",
+  samlMetadataSize: "请选择不超过 256 KiB 的 UTF-8 XML 文件。",
+  samlSigningCertificate: "SP 签名证书",
+  samlIdpMetadata: "Burrow IdP metadata",
   mfaBind: "绑定多因素认证",
   mfaVerify: "验证身份",
   mfaBindHint:

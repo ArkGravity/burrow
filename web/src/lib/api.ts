@@ -12,6 +12,7 @@ export interface LoginState {
   step: "password" | "bind" | "verify" | "complete";
   expiresAt: string;
   requestId: string;
+  requestType?: "oidc" | "saml";
   redirect?: string;
 }
 export interface Session {
@@ -24,6 +25,25 @@ export interface Session {
 export interface Row {
   id: string;
   [key: string]: unknown;
+}
+export interface SAMLConfiguration {
+  entityId: string;
+  acsUrl: string;
+  signingCertificate: string;
+  metadataXml: string;
+  configVersion: number;
+}
+export interface Application extends Row {
+  name: string;
+  protocol: "oidc" | "saml";
+  saml?: SAMLConfiguration;
+}
+export interface ApplicationRef {
+  id: string;
+  name: string;
+  protocol?: "oidc" | "saml";
+  clientId?: string;
+  samlEntityId?: string;
 }
 export interface List<T = Row> {
   items: T[];

@@ -79,7 +79,7 @@ func (b *Server) protocol(w http.ResponseWriter, r *http.Request) {
 			clientID = r.Form.Get("client_id")
 		}
 		var app Application
-		if b.DB.Where("client_id = ? AND enabled = ?", clientID, true).First(&app).Error != nil || (app.ClientType == "web" && !basic) || (app.ClientType == "spa" && (basic || r.Form.Get("client_secret") != "")) {
+		if b.DB.Where("client_id = ? AND enabled = ? AND protocol = ?", clientID, true, "oidc").First(&app).Error != nil || (app.ClientType == "web" && !basic) || (app.ClientType == "spa" && (basic || r.Form.Get("client_secret") != "")) {
 			write(w, 401, map[string]string{"error": "invalid_client"})
 			return
 		}
@@ -93,7 +93,7 @@ func (b *Server) protocol(w http.ResponseWriter, r *http.Request) {
 		r.AddCookie(&http.Cookie{Name: "burrow_browser", Value: v})
 		q := r.URL.Query()
 		var app Application
-		if b.DB.Where("client_id = ? AND enabled = ?", q.Get("client_id"), true).First(&app).Error != nil || !contains(app.RedirectURLs, q.Get("redirect_uri")) {
+		if b.DB.Where("client_id = ? AND enabled = ? AND protocol = ?", q.Get("client_id"), true, "oidc").First(&app).Error != nil || !contains(app.RedirectURLs, q.Get("redirect_uri")) {
 			write(w, 400, map[string]string{"error": "invalid_request"})
 			return
 		}
@@ -134,15 +134,20 @@ func (b *Server) oidcLogin(w http.ResponseWriter, r *http.Request) {
 	u, session, e := b.session(r)
 	mustLogin := e != nil
 	if !mustLogin {
-		if contains(a.Request.Prompt, "login") && session.AuthTime.Before(a.ExpiresAt.Add(-b.Config.LoginTTL)) {
+		createdAt := b.legacyDatabaseTime(a.ExpiresAt).Add(-b.Config.LoginTTL)
+		authenticatedAt := session.AuthTime
+		if !session.UTCTimestamps {
+			authenticatedAt = b.legacyDatabaseTime(authenticatedAt)
+		}
+		if contains(a.Request.Prompt, "login") && authenticatedAt.Before(createdAt) {
 			mustLogin = true
 		}
 		if a.Request.MaxAge != nil {
 			max := time.Duration(*a.Request.MaxAge) * time.Second
 			if *a.Request.MaxAge == 0 {
-				mustLogin = mustLogin || session.AuthTime.Before(a.ExpiresAt.Add(-b.Config.LoginTTL))
+				mustLogin = mustLogin || authenticatedAt.Before(createdAt)
 			} else {
-				mustLogin = mustLogin || time.Since(session.AuthTime) > max
+				mustLogin = mustLogin || time.Since(authenticatedAt) > max
 			}
 		}
 		a.UserID = u.ID
@@ -198,24 +203,6 @@ func (b *Server) authError(w http.ResponseWriter, r *http.Request, a *authReques
 	u.RawQuery = q.Encode()
 	http.Redirect(w, r, u.String(), 302)
 }
-func (b *Server) authContext(w http.ResponseWriter, r *http.Request) {
-	id := r.URL.Query().Get("requestId")
-	name := ""
-	if id != "" {
-		a, e := b.browserAuth(r, id)
-		if e != nil {
-			fail(w, r, 400, "invalid_transaction")
-			return
-		}
-		var app Application
-		if b.DB.First(&app, "id = ? AND enabled = ?", a.ClientID, true).Error != nil {
-			fail(w, r, 400, "invalid_application")
-			return
-		}
-		name = app.Name
-	}
-	write(w, 200, map[string]string{"applicationName": name})
-}
 func (b *Server) oidcLogout(w http.ResponseWriter, r *http.Request) {
 	if r.Method == "GET" {
 		target := "/logout"
@@ -256,7 +243,7 @@ func (b *Server) oidcLogout(w http.ResponseWriter, r *http.Request) {
 		}
 		var app Application
 		aud := claims.GetAudience()
-		if len(aud) != 1 || b.DB.Where("client_id = ?", aud[0]).First(&app).Error != nil {
+		if len(aud) != 1 || b.DB.Where("client_id = ? AND protocol = ?", aud[0], "oidc").First(&app).Error != nil {
 			fail(w, r, 400, "invalid_logout")
 			return
 		}

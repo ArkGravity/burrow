@@ -26,7 +26,17 @@ import {
   LockOutlined,
   SafetyCertificateOutlined,
 } from "@ant-design/icons";
-import { api, write, APIError, type Row, type List } from "../lib/api";
+import {
+  api,
+  write,
+  APIError,
+  type Row,
+  type List,
+  type ApplicationRef,
+  type SAMLConfiguration,
+} from "../lib/api";
+import { applicationPayload } from "../lib/applications";
+import { SAMLApplicationFields } from "../components/SAMLApplicationFields";
 import { can } from "../lib/access";
 import { passwordRule } from "../lib/password";
 import { useSession } from "../lib/session";
@@ -102,6 +112,16 @@ const definitions: Record<
     fields: [
       { key: "name", label: "name", required: true },
       {
+        key: "protocol",
+        label: "protocol",
+        type: "select",
+        options: [
+          { value: "oidc", label: "oidcProtocol" },
+          { value: "saml", label: "samlProtocol" },
+        ],
+        required: true,
+      },
+      {
         key: "clientType",
         label: "clientType",
         type: "select",
@@ -160,15 +180,17 @@ export function Resources({ resource }: { resource: string }) {
   const [resettingMFA, setResettingMFA] = useState(false);
   const [form] = Form.useForm();
   const clientType = Form.useWatch("clientType", form);
+  const protocol = Form.useWatch("protocol", form) || "oidc";
   const [passwordForm] = Form.useForm();
   const writable = can(session?.permissions || [], def.permission);
   const authWritable = can(session?.permissions || [], "authorization:write");
   const administrator = session?.administrator === true;
   const permissionLabel = (row: Row) => {
-    const app = row.application as
-      { name?: string; clientId?: string } | undefined;
+    const app = row.application as ApplicationRef | undefined;
+    const identity =
+      app?.protocol === "saml" ? app.samlEntityId : app?.clientId;
     return app
-      ? `${app.name || app.clientId} · ${t("applicationLoginPermission")} (${app.clientId})`
+      ? `${app.name || identity} · ${t("applicationLoginPermission")} (${identity})`
       : String(row.name || row.id);
   };
   const load = useCallback(async () => {
@@ -205,6 +227,7 @@ export function Resources({ resource }: { resource: string }) {
           )
         : {
             enabled: true,
+            protocol: "oidc",
             clientType: "web",
             allowWithoutPkce: false,
           },
@@ -255,6 +278,7 @@ export function Resources({ resource }: { resource: string }) {
         if (editing || values.clientType === "spa") delete values.clientSecret;
         if (!administrator) delete values.allowWithoutPkce;
         else if (values.clientType === "spa") values.allowWithoutPkce = false;
+        values = applicationPayload(values);
       }
       const result = await write<Row>(
         `/${resource}${editing ? "/" + editing.id : ""}`,
@@ -311,7 +335,14 @@ export function Resources({ resource }: { resource: string }) {
             <div className="record-sub">
               {resource === "permissions"
                 ? row.id
-                : String(row.username || row.clientId || row.description || "")}
+                : String(
+                    row.username ||
+                      (row.protocol === "saml"
+                        ? (row.saml as SAMLConfiguration | undefined)?.entityId
+                        : row.clientId) ||
+                      row.description ||
+                      "",
+                  )}
             </div>
           </div>
           {row.builtin === true && <Tag>{t("builtin")}</Tag>}
@@ -404,19 +435,21 @@ export function Resources({ resource }: { resource: string }) {
                     )}
                   </>
                 )}
-                {resource === "applications" && row.clientType !== "spa" && (
-                  <Popconfirm
-                    title={t("resetSecret")}
-                    onConfirm={() => action(`/applications/${row.id}/secret`)}
-                  >
-                    <Button
-                      size="small"
-                      type="text"
-                      aria-label={t("resetSecret")}
-                      icon={<KeyOutlined />}
-                    />
-                  </Popconfirm>
-                )}
+                {resource === "applications" &&
+                  row.protocol !== "saml" &&
+                  row.clientType !== "spa" && (
+                    <Popconfirm
+                      title={t("resetSecret")}
+                      onConfirm={() => action(`/applications/${row.id}/secret`)}
+                    >
+                      <Button
+                        size="small"
+                        type="text"
+                        aria-label={t("resetSecret")}
+                        icon={<KeyOutlined />}
+                      />
+                    </Popconfirm>
+                  )}
                 <Popconfirm
                   title={t("deleteTitle")}
                   description={t("deleteNote")}
@@ -527,6 +560,17 @@ export function Resources({ resource }: { resource: string }) {
               (f) =>
                 (!f.createOnly || !editing) &&
                 (resource !== "applications" ||
+                  protocol !== "saml" ||
+                  ![
+                    "clientId",
+                    "clientSecret",
+                    "clientType",
+                    "redirectUris",
+                    "postLogoutRedirectUris",
+                    "origins",
+                    "allowWithoutPkce",
+                  ].includes(f.key)) &&
+                (resource !== "applications" ||
                   f.key !== "clientSecret" ||
                   clientType === "web") &&
                 (f.key !== "allowWithoutPkce" || clientType === "web"),
@@ -603,7 +647,10 @@ export function Resources({ resource }: { resource: string }) {
                     />
                   ) : field.type === "select" ? (
                     <Select
-                      disabled={field.key === "clientType" && !!editing}
+                      disabled={
+                        ["clientType", "protocol"].includes(field.key) &&
+                        !!editing
+                      }
                       options={field.options?.map((o) => ({
                         value: o.value,
                         label: t(o.label),
@@ -615,6 +662,18 @@ export function Resources({ resource }: { resource: string }) {
                 </Form.Item>
               );
             })}
+          {resource === "applications" && protocol === "saml" && (
+            <SAMLApplicationFields
+              summary={editing?.saml as SAMLConfiguration | undefined}
+            />
+          )}
+          {resource === "users" && editing && (
+            <Form.Item label={t("userId")}>
+              <Typography.Text code copyable>
+                {editing.id}
+              </Typography.Text>
+            </Form.Item>
+          )}
         </Form>
       </Drawer>
       <Modal

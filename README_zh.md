@@ -21,14 +21,16 @@ Go 后端与 React 界面打包为一个二进制，也支持通过 Docker Compo
 ## 功能与适用范围
 
 - **单点登录：** 通过 OIDC Authorization Code 接入 Web、SPA 应用，默认要求 PKCE S256。
+- **SAML IdP：** 支持签名的 SP 发起 Redirect 请求、双签 POST 响应及手动配置的 [Jenkins 示例](examples/local-sso/jenkins/README.md)。
 - **密码认证：** 支持临时密码改密和 TOTP MFA；MFA 默认关闭，手动开启后对所有账户生效。
 - **访问管理：** 用户、用户组、自定义角色、权限、管理审计，以及展示获授权应用的个人门户。
 - **双语与主题：** 英文、简体中文，以及浅色、深色和跟随系统主题。
 - **简单部署：** 单二进制内嵌前端，生产使用 PostgreSQL，开发与测试支持 SQLite，无需 Redis 或队列。
 
-项目受 Casdoor 启发并独立实现，专注 Burrow 密码登录与下游 OIDC 接入。
+项目受 Casdoor 启发并独立实现，专注 Burrow 密码登录、下游 OIDC 和约定范围内的 SAML 接入。
 当前不提供上游身份联合登录、Refresh Token 或跨应用统一登出。
 应用自身的会话与业务权限由应用管理，详见[协议边界](docs/development/oidc-adapter.md)。
+SAML 的边界和实际互操作状态见[独立验证记录](docs/testing/saml-jenkins.md)。
 
 ## 界面预览
 

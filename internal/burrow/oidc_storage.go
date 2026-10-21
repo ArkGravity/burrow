@@ -118,7 +118,7 @@ func (s oidcStore) CreateAuthRequest(ctx context.Context, r *oidc.AuthRequest, _
 		return nil, e
 	}
 	var app Application
-	if e = s.DB.Where("client_id = ? AND enabled = ?", r.ClientID, true).First(&app).Error; e != nil {
+	if e = s.DB.Where("client_id = ? AND enabled = ? AND protocol = ?", r.ClientID, true, "oidc").First(&app).Error; e != nil {
 		return nil, e
 	}
 	if e = validatePKCE(app, r); e != nil {
@@ -184,10 +184,10 @@ func (b *Server) authorized(tx *gorm.DB, a AuthTransaction) (User, Session, erro
 	if e := tx.Where("id = ? AND enabled = ? AND must_change_password = ? AND password_hash <> ?", a.UserID, true, false, "").First(&u).Error; e != nil {
 		return u, session, e
 	}
-	if e := tx.Where("id = ? AND revoked = ? AND expires_at > ? AND user_id = ?", a.SessionID, false, time.Now(), u.ID).First(&session).Error; e != nil {
+	if e := b.liveSessions(tx, time.Now()).Where("id = ? AND user_id = ?", a.SessionID, u.ID).First(&session).Error; e != nil {
 		return u, session, e
 	}
-	if e := tx.Where("id = ? AND enabled = ?", a.ClientID, true).First(&app).Error; e != nil {
+	if e := tx.Where("id = ? AND enabled = ? AND protocol = ?", a.ClientID, true, "oidc").First(&app).Error; e != nil {
 		return u, session, e
 	}
 	// Token-backed UserInfo checks have no authorization request payload.
@@ -268,12 +268,12 @@ func (s oidcStore) RevokeToken(context.Context, string, string, string) *oidc.Er
 }
 func (s oidcStore) GetClientByClientID(ctx context.Context, id string) (op.Client, error) {
 	var a Application
-	e := s.DB.WithContext(ctx).Where("client_id = ? AND enabled = ?", id, true).First(&a).Error
+	e := s.DB.WithContext(ctx).Where("client_id = ? AND enabled = ? AND protocol = ?", id, true, "oidc").First(&a).Error
 	return client{a, s.Config.Env == "dev", s.Config.TokenTTL}, e
 }
 func (s oidcStore) AuthorizeClientIDSecret(ctx context.Context, id, secret string) error {
 	var a Application
-	if e := s.DB.WithContext(ctx).Where("client_id = ? AND enabled = ? AND client_type = ?", id, true, "web").First(&a).Error; e != nil {
+	if e := s.DB.WithContext(ctx).Where("client_id = ? AND enabled = ? AND client_type = ? AND protocol = ?", id, true, "web", "oidc").First(&a).Error; e != nil {
 		return oidc.ErrInvalidClient()
 	}
 	if !hmac.Equal([]byte(a.SecretHash), []byte(hash(secret))) {
@@ -313,7 +313,7 @@ func (s oidcStore) SetUserinfoFromToken(ctx context.Context, info *oidc.UserInfo
 	}
 	if origin != "" {
 		var a Application
-		if e = s.DB.First(&a, "id = ?", token.ClientID).Error; e != nil || !contains(a.Origins, origin) {
+		if e = s.DB.First(&a, "id = ? AND protocol = ?", token.ClientID, "oidc").Error; e != nil || !contains(a.Origins, origin) {
 			return errors.New("origin denied")
 		}
 	}

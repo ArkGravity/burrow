@@ -5,7 +5,7 @@ export default defineConfig({
   server: {
     port: 5173,
     proxy: Object.fromEntries(
-      ["/api", "/oidc", "/.well-known"].map((p) => [
+      ["/api", "/oidc", "/saml", "/.well-known"].map((p) => [
         p,
         {
           target: "http://127.0.0.1:8080",

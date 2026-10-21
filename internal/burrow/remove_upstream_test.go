@@ -113,7 +113,7 @@ func TestRemoveUpstreamMigration(t *testing.T) {
 				}
 				for _, method := range []string{"password", "oidc", "unknown"} {
 					session := Session{ID: method, UserID: u.ID, CredentialHash: hash(method), Method: method, AuthTime: time.Now(), ExpiresAt: time.Now().Add(time.Hour)}
-					if err := s.DB.Omit("MFAAt", "AuthVersion").Create(&session).Error; err != nil {
+					if err := s.DB.Omit("MFAAt", "AuthVersion", "UTCTimestamps").Create(&session).Error; err != nil {
 						t.Fatal(err)
 					}
 					if err := s.DB.Create(&TokenRecord{ID: method, UserID: u.ID, ClientID: a.ID, SessionID: method, ExpiresAt: session.ExpiresAt}).Error; err != nil {

@@ -137,7 +137,7 @@ jobs:
       - name: Install Chromium and system dependencies
         run: bun x playwright install --with-deps chromium
         working-directory: web
-      - name: Run browser tests with independent OIDC clients
+      - name: Run OIDC clients and SAML management/continuation browser tests
         run: make test-e2e
       - uses: actions/upload-artifact@v4
         if: failure()

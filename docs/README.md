@@ -24,12 +24,15 @@ A [Simplified Chinese introduction and setup guide](../README_zh.md) is also ava
 - [Release installation template](releases/INSTALL.md) (rendered for each release)
 - [Seed and default role boundaries](development/seed.md)
 - [OIDC adapter boundaries](development/oidc-adapter.md)
+- [SAML IdP adapter boundaries](development/saml-adapter.md)
 - [Mandatory MFA and account recovery](development/mfa-proposal.md)
 
 ## Operations and verification
 
 - [Backup, recovery, upgrades and signing-key rotation](operations/recovery.md)
 - [Grafana OIDC integration and acceptance](operations/grafana.md)
+- [Jenkins SAML configuration and recovery](operations/jenkins.md)
+- [SAML and Jenkins verification evidence](testing/saml-jenkins.md)
 - [Local Docker Burrow, Grafana, Nightingale, Harbor and Nginx example](../examples/local-sso/README.md)
 - [Protocol interoperability and regression verification](testing/oidc-conformance.md)
 - [CI workflow](../.github/workflows/ci.yml)
