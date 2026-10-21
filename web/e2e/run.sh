@@ -41,4 +41,4 @@ while [ "$attempt" -lt 10 ]; do
   sleep 1
 done
 if [ "$BURROW_E2E_READY" != 1 ]; then cat "$BURROW_E2E_TMP/server.log"; exit 1; fi
-bun run --cwd web test:e2e
+bun run --cwd web test:e2e "$@"

@@ -90,7 +90,7 @@ func (s *Store) Migrate() error {
 		if err := tx.First(&v, 1).Error; err != nil {
 			return err
 		}
-		migrations := []string{initialMigration, pkceCompatibilityMigration, customRolesMigration, removeUpstreamMigration, mandatoryMFAMigration}
+		migrations := []string{initialMigration, pkceCompatibilityMigration, customRolesMigration, removeUpstreamMigration, mandatoryMFAMigration, samlIDPMigration}
 		if v.Version > len(migrations) {
 			return errors.New("database schema is newer than binary")
 		}
@@ -120,11 +120,29 @@ func (s *Store) Migrate() error {
 	})
 }
 func (s *Store) Health(ctx context.Context) error {
+	if err := s.SchemaHealth(ctx); err != nil {
+		return err
+	}
+	var samlEnabled int64
+	if err := s.DB.WithContext(ctx).Model(&Application{}).Where("protocol = ? AND enabled = ?", "saml", true).Count(&samlEnabled).Error; err != nil {
+		return err
+	}
+	if samlEnabled > 0 {
+		if _, _, err := s.samlSigningKey(s.DB.WithContext(ctx), time.Now()); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// SchemaHealth permits operator key recovery even when an expired signing key
+// makes readiness fail. It never creates or upgrades database objects.
+func (s *Store) SchemaHealth(ctx context.Context) error {
 	var v SchemaVersion
 	if err := s.DB.WithContext(ctx).First(&v, 1).Error; err != nil {
 		return err
 	}
-	if v.Version != 5 || v.Checksum != migrationChecksum(5) {
+	if v.Version != 6 || v.Checksum != migrationChecksum(6) {
 		return errors.New("migration required")
 	}
 	return nil
@@ -247,9 +265,16 @@ func (s *Store) Cleanup(ctx context.Context) {
 			return
 		case <-ticker.C:
 			now := time.Now()
-			for _, m := range []any{&Session{}, &AuthTransaction{}, &TokenRecord{}, &LoginTransaction{}} {
+			for _, m := range []any{&AuthTransaction{}, &TokenRecord{}, &LoginTransaction{}} {
 				s.DB.Where("expires_at < ?", now).Delete(m)
 			}
+			if s.Config.DBDriver == "sqlite" {
+				s.DB.Where("julianday(expires_at) < julianday(?)", now.UTC()).Delete(&Session{})
+			} else {
+				s.DB.Where("(utc_timestamps = ? AND expires_at < ?) OR (utc_timestamps = ? AND expires_at < ?)", true, now.UTC(), false, now).Delete(&Session{})
+			}
+			s.DB.Where("expires_at < ?", now.UTC()).Delete(&SAMLTransaction{})
+			s.DB.Where("replay_until < ?", now.UTC()).Delete(&SAMLRequestReplay{})
 			s.DB.Where("created_at < ?", now.Add(-s.Config.EventRetention)).Delete(&Event{})
 		}
 	}
@@ -287,6 +312,9 @@ func checkPasswordLoginMigration(tx *gorm.DB) error {
 //go:embed migrations/005_mandatory_mfa.sql
 var mandatoryMFAMigration string
 
+//go:embed migrations/006_saml_idp.sql
+var samlIDPMigration string
+
 func migrationChecksum(version int) string {
 	if version == 1 {
 		return hash(initialMigration)
@@ -300,7 +328,11 @@ func migrationChecksum(version int) string {
 	if version == 4 {
 		return hash(initialMigration + pkceCompatibilityMigration + customRolesMigration + removeUpstreamMigration)
 	}
-	return hash(initialMigration + pkceCompatibilityMigration + customRolesMigration + removeUpstreamMigration + mandatoryMFAMigration)
+	previous := initialMigration + pkceCompatibilityMigration + customRolesMigration + removeUpstreamMigration + mandatoryMFAMigration
+	if version == 5 {
+		return hash(previous)
+	}
+	return hash(previous + samlIDPMigration)
 }
 
 func (c *Config) defaults() {

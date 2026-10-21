@@ -1,0 +1,69 @@
+x-burrow: &burrow
+  image: burrow:saml-test
+  environment:
+    BURROW_ENV: dev
+    BURROW_LISTEN_ADDR: :8080
+    BURROW_ISSUER: https://sso.burrow.test:${BURROW_SAML_HTTPS_PORT:-443}
+    BURROW_DB_DRIVER: sqlite
+    BURROW_DB_DSN: /data/burrow.db
+    BURROW_MASTER_KEY: ${BURROW_SAML_MASTER_KEY:?temporary key required}
+    BURROW_MFA_ENABLED: ${BURROW_SAML_MFA_ENABLED:-true}
+    BURROW_BOOTSTRAP_ADMIN_USERNAME: admin
+    BURROW_BOOTSTRAP_ADMIN_PASSWORD: Fixture-initial-password-2026
+  volumes:
+    - burrow-data:/data
+  read_only: true
+  tmpfs: [/tmp]
+
+services:
+  volume-init:
+    image: burrow:saml-test
+    user: "0:0"
+    entrypoint: [/bin/sh, -c]
+    command: ["chown 65532:65532 /data"]
+    volumes: [burrow-data:/data]
+    healthcheck: { disable: true }
+  migrate:
+    <<: *burrow
+    command: [migrate]
+    depends_on:
+      volume-init: { condition: service_completed_successfully }
+    healthcheck: { disable: true }
+  seed:
+    <<: *burrow
+    command: [seed]
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+    healthcheck: { disable: true }
+  burrow:
+    <<: *burrow
+    command: [serve]
+    depends_on:
+      seed: { condition: service_completed_successfully }
+    healthcheck:
+      test: [CMD, burrow, healthcheck]
+      interval: 2s
+      timeout: 3s
+      retries: 20
+  nginx:
+    image: nginx:1.30.5-alpine
+    ports: ["127.0.0.1::443"]
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ${BURROW_SAML_TMP:?temporary directory required}/tls:/tls:ro
+    networks:
+      default:
+        aliases: [sso.burrow.test, jenkins.burrow.test, jenkins.burrow-sp.test]
+  jenkins:
+    image: burrow-jenkins:saml-test
+    environment:
+      JAVA_OPTS: -Djenkins.install.runSetupWizard=false
+      JENKINS_URL: https://${BURROW_SAML_JENKINS_HOST:-jenkins.burrow.test}:${BURROW_SAML_HTTPS_PORT:-443}
+    volumes:
+      - jenkins-data:/var/jenkins_home
+      - ./init.groovy:/usr/share/jenkins/ref/init.groovy.d/10-saml.groovy:ro
+      - ${BURROW_SAML_TMP:?temporary directory required}/public:/fixture:ro
+
+volumes:
+  burrow-data:
+  jenkins-data:

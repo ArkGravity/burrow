@@ -5,7 +5,7 @@ executable documentation when historical design records disagree with them.
 
 ## Product scope
 
-Burrow is an independently implemented, lightweight, single-organization OIDC
+Burrow is an independently implemented, lightweight, single-organization OIDC and SAML
 identity provider inspired by Casdoor. Keep the implementation focused on shared
 SSO, personal profiles, application portals, users, groups, roles, permissions,
 application configuration and Burrow password authentication.
@@ -17,7 +17,9 @@ application configuration and Burrow password authentication.
 - Keep production deployment configuration in the root `docker-compose.yml`.
   Standalone local integration examples belong under `examples/`.
 - Do not add protocols, grants or account-provisioning features beyond the agreed
-  OIDC scope unless explicitly requested.
+  OIDC and downstream SAML subset unless explicitly requested. SAML is SP-initiated
+  Redirect/POST with signed requests and double-signed responses; Jenkins is the
+  first example. Encryption, SLO, IdP-initiated login, SCIM and upstream SAML remain out of scope.
 
 ## Architecture and source ownership
 
@@ -169,6 +171,11 @@ the full Groups API. Avoid per-user membership queries.
 - Migration 005 adds mandatory MFA and schema v5, invalidates previous shared sessions,
   tokens and unfinished authorizations, and preserves identities, passwords, grants,
   applications and signing keys. Never edit migration 001–004 or auto-bind existing users.
+- Migration 006 adds schema v6 and SAML without revoking OIDC data. Never edit
+  migrations 001–005. Preserve independent replay guards through cancel/reset,
+  key rotation and application deletion. New sessions/SAML times use UTC; the
+  session marker preserves historical expiry comparisons. SAML requires fresh
+  authentication for legacy sessions with ambiguous timestamps.
 - Startup order is migration, seed, then server. Keep readiness and signing-key
   validation meaningful. Compose shutdown must preserve database volumes.
 
@@ -206,6 +213,9 @@ when using local overrides. Inspect `make help` for available actions.
 
 ## Local SSO integrations
 
+- On 2026-10-21, the user reported successful manual local integration of Grafana
+  and Nightingale through OIDC and Jenkins through SAML using the current guides.
+  Preserve this checkpoint separately from automated tests, CI and production validation.
 - The user reported successful local OIDC web-login acceptance for Grafana,
   Nightingale and Harbor on 2026-10-01. Keep this user-reported checkpoint distinct
   from automated checks, production validation and official OIDC certification.
@@ -216,6 +226,10 @@ when using local overrides. Inspect `make help` for available actions.
 - Maintain the independent `examples/local-sso` deployment without changing the
   root Compose or clearing existing databases. Burrow uses dev SQLite; Grafana,
   Nightingale and Harbor are reached through the example Nginx.
+- Jenkins is opt-in through the `jenkins` profile and its own data volume. Keep
+  realm/Matrix configuration manual in that example; automatic setup belongs
+  only to the isolated opt-in Jenkins browser fixture. Do not make default E2E
+  depend on Jenkins. Record real SP results separately from Go/SDK self-tests.
 - Create downstream Applications manually in Burrow and grant login permissions
   through ordinary roles assigned to users or groups. Burrow authenticates these
   users with passwords; upstream Providers are no longer supported.

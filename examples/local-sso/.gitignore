@@ -2,6 +2,7 @@
 /harbor/runtime/
 /harbor/data/
 /harbor/logs/
+/jenkins/backups/
 
 # Python bytecode from local deployment helpers.
 __pycache__/

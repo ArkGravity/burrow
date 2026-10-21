@@ -40,7 +40,23 @@
 
 ## 升级失败
 
-当前 schema 为 v5（迁移 005 强制 MFA）。迁移 `003_custom_roles.sql` 清理空权限 Viewer 的用户/组关联和未使用的旧 Editor/Viewer，保留有成员及实际权限的旧角色为普通角色；权限码保持不变。详见 [角色升级说明](../development/seed.md#upgrade-from-editor-and-viewer)。升级后旧二进制无法运行在 v5 数据库上，回滚需要升级前备份。
+当前 schema 为 v6（迁移 006 增加下游 SAML）。迁移 `003_custom_roles.sql` 清理空权限 Viewer 的用户/组关联和未使用的旧 Editor/Viewer，保留有成员及实际权限的旧角色为普通角色；权限码保持不变。详见 [角色升级说明](../development/seed.md#upgrade-from-editor-and-viewer)。升级后旧二进制无法运行在 v6 数据库上，回滚需要升级前备份。
+
+## SAML 证书与 schema v6
+
+迁移 006 在原表增加协议、类型化登录续接和 UTC 会话标记，并增加四个 SAML 表。001–005 的校验和不变；现有 OIDC 应用、密钥、权限、Token、会话和未完成授权保留。新会话以 UTC 保存，旧会话按原时间基准检查有效期；SAML 要求时间基准不明确的旧会话重新认证，不延长 OIDC 旧会话。
+
+先备份数据库与原 master key，停止旧服务，执行新版本 `migrate`，再按原顺序 seed、serve。migrate 幂等初始化独立 RSA-3072 SAML 密钥，私钥使用原 master key 加密，证书有效期 365 天。serve 不隐式生成或替换损坏密钥；启用的 SAML 应用需要可用活动密钥，否则 readiness 失败。
+
+默认 `keys-rotate` 仍只轮换 OIDC。SAML 轮换必须指定协议和原因：
+
+```bash
+burrow keys-rotate --config configs/config.local.yaml --protocol saml --reason "Scheduled certificate renewal"
+```
+
+轮换保留历史公开证书，作废旧待处理 SAML 请求并原子写入审计，不改变 OIDC keyset。它不删除独立防重放记录，也不撤销 Jenkins 自己的会话。该命令只要求 schema 正确，因此可以在证书过期、readiness 失败时用于恢复。错误 master key 必须先恢复原值；不要换 master key 试图修复签名密钥。
+
+安排维护窗口，轮换后将 `/saml/metadata` 的新证书手动更新到 Jenkins，再验收；不能假设单证书 SP 无缝接受旧、新两把键。SP 证书变化则导入新 Jenkins metadata 到原 Burrow 应用，保留应用权限。完整步骤见 [Jenkins 手动配置与恢复](../../examples/local-sso/jenkins/README.md)。
 
 数据库迁移具备版本和校验和，修改已经应用的迁移文件会被拒绝。应用启动不会自行修改 schema。迁移失败时先修复原因，再重跑迁移；不要绕过校验或手工提升版本号。
 

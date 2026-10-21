@@ -6,6 +6,8 @@
 
 验收完成后，已按用户要求清理该环境的容器、数据卷、网络、验收镜像及 Harbor 本地生成目录，保留全部示例源码。再次运行时按以下启动步骤重新拉取/构建镜像，并在 Burrow 创建应用、分配角色权限，在夜莺和 Harbor UI 中填写 SSO 配置；之前的本地账号和配置不再保留。
 
+新增的可选 [Jenkins SAML 示例](jenkins/README.md) 使用 `--profile jenkins` 启动，域名为 `jenkins.yakir.top`，数据位于独立 `jenkins-data` 卷。默认启动不依赖 Jenkins。首次接入、稳定用户 ID、Matrix 权限、手动 metadata 交换和恢复步骤见该指南；实际联调状态见 [SAML 验证记录](../../docs/testing/saml-jenkins.md)，不沿用上面的 OIDC 用户验收结论。
+
 ## 启动
 
 确保 Docker 已启动、宿主机 80 端口空闲，并将以下域名解析到本机：
@@ -247,6 +249,8 @@ Compose 项目名为 `burrow-local-sso`，SQLite 数据库、签名密钥和用�
 Harbor 数据和内部密钥保存在 `harbor/data/`，日志保存在 `harbor/logs/`，生成的 Compose 和配置在 `harbor/runtime/`；本示例的 [.gitignore](.gitignore) 按目录统一忽略这三类本地文件和 Python 字节码缓存。Burrow、Grafana 和夜莺的数据在 Docker 命名卷中，不会生成仓库文件。停止 Harbor 不会删除本地目录。重新生成配置复用已有内部密钥，不要将生成配置、密钥或数据库提交到仓库。基础 Compose 的 `down -v` 不会删除 Harbor 的这些目录。
 
 仅在明确需要清空该示例的全部账号、应用、密钥、Grafana 和夜莺数据时运行：
+
+若已启用 Jenkins，还会涉及本项目的 Jenkins 数据卷；操作前单独备份 Jenkins home，不把停止服务当作删除数据的授权。
 
 ```bash
 docker compose -f examples/local-sso/docker-compose.yml down -v

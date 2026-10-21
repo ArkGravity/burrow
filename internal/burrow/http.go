@@ -10,7 +10,6 @@ import (
 	"fmt"
 	"io/fs"
 	"net/http"
-	"net/url"
 	"os"
 	"path"
 	"strings"
@@ -107,8 +106,12 @@ func NewServer(s *Store, assets ...fs.FS) (*Server, error) {
 	r.Get("/oidc/authorize/callback", b.protocol)
 	r.Get("/oidc/logout", b.oidcLogout)
 	r.Post("/oidc/logout", b.oidcLogout)
+	r.Get("/saml/metadata", b.samlMetadata)
+	r.Get("/saml/certificate", b.samlCertificate)
+	r.Get("/saml/sso", b.samlSSO)
+	r.Get("/saml/login", b.samlLogin)
 	r.NotFound(func(w http.ResponseWriter, r *http.Request) {
-		if strings.HasPrefix(r.URL.Path, "/api/") || strings.HasPrefix(r.URL.Path, "/oidc/") || strings.HasPrefix(r.URL.Path, "/.well-known/") || (r.Method != "GET" && r.Method != "HEAD") {
+		if strings.HasPrefix(r.URL.Path, "/api/") || strings.HasPrefix(r.URL.Path, "/oidc/") || r.URL.Path == "/saml" || strings.HasPrefix(r.URL.Path, "/saml/") || strings.HasPrefix(r.URL.Path, "/.well-known/") || (r.Method != "GET" && r.Method != "HEAD") {
 			fail(w, r, 404, "not_found")
 			return
 		}
@@ -334,8 +337,13 @@ func (b *Server) changePassword(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	var in struct{ CurrentPassword, Password, RequestID string }
+	var in struct{ CurrentPassword, Password, RequestID, RequestType string }
 	if !decode(w, r, &in) {
+		return
+	}
+	ref, refErr := normalizeLoginRequest(in.RequestType, in.RequestID)
+	if refErr != nil {
+		mutationError(w, r, refErr)
 		return
 	}
 	if !passwordOK(u.PasswordHash, in.CurrentPassword) {
@@ -351,10 +359,19 @@ func (b *Server) changePassword(w http.ResponseWriter, r *http.Request) {
 		if current.PasswordHash != u.PasswordHash {
 			return errors.New("invalid_credentials")
 		}
+		if ref.ID != "" {
+			browser, err := r.Cookie("burrow_browser")
+			if err != nil {
+				return errors.New("invalid_transaction")
+			}
+			if err := b.validateLoginRequest(tx, current, LoginTransaction{RequestType: ref.Type, RequestID: ref.ID, BrowserHash: hash(browser.Value)}); err != nil {
+				return err
+			}
+		}
 		if err := tx.Model(&User{}).Where("id = ? AND password_hash = ?", current.ID, u.PasswordHash).Updates(map[string]any{"password_hash": h, "must_change_password": false, "auth_version": gorm.Expr("auth_version + 1")}).Error; err != nil {
 			return err
 		}
-		if err := invalidateAuthentication(tx, current.ID, "", ""); err != nil {
+		if err := invalidateAuthentication(tx, current.ID, "", ref); err != nil {
 			return err
 		}
 		return tx.Model(&Session{}).Where("id = ?", session.ID).Updates(map[string]any{"auth_version": current.AuthVersion + 1, "revoked": false}).Error
@@ -369,8 +386,8 @@ func (b *Server) changePassword(w http.ResponseWriter, r *http.Request) {
 		fail(w, r, 503, "unavailable")
 		return
 	}
-	if in.RequestID != "" {
-		out["redirect"] = "/oidc/login?requestId=" + url.QueryEscape(in.RequestID)
+	if ref.ID != "" {
+		out["redirect"], _ = loginRequestURL(ref)
 	}
 	write(w, 200, out)
 }

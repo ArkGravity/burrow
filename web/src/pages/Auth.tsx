@@ -19,6 +19,7 @@ import { safeRedirect } from "../lib/access";
 import { passwordRule } from "../lib/password";
 import { Preferences } from "../components/Preferences";
 import { BrandMark } from "../components/BrandMark";
+import { readLoginRequest, sameLoginRequest } from "../lib/login-request";
 
 export function AuthFrame({ children }: { children: React.ReactNode }) {
   const { t } = useI18n();
@@ -70,22 +71,35 @@ export function LoginPage() {
   const { t } = useI18n();
   const { session } = useSession();
   const [query] = useSearchParams();
-  const requestId = query.get("requestId") || "";
+  const request = (() => {
+    try {
+      return { ...readLoginRequest(query.toString()), invalid: false };
+    } catch {
+      return { requestType: "oidc" as const, requestId: "", invalid: true };
+    }
+  })();
+  const { requestId, requestType } = request;
   const [context, setContext] = useState<{ applicationName?: string }>({});
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   useEffect(() => {
+    if (request.invalid) {
+      setError("INVALID_TRANSACTION");
+      return;
+    }
     void api<LoginState>("/auth/login/status")
       .then((value) => {
-        if (value.requestId === requestId) continueLogin(value);
+        if (sameLoginRequest(value, { requestId, requestType }))
+          continueLogin(value);
       })
       .catch(() => {});
-  }, [requestId]);
+  }, [requestId, requestType, request.invalid]);
   useEffect(() => {
+    if (request.invalid) return;
     let live = true;
     (requestId
       ? api<typeof context>(
-          `/auth/context?requestId=${encodeURIComponent(requestId)}`,
+          `/auth/context?requestType=${requestType}&requestId=${encodeURIComponent(requestId)}`,
         )
       : Promise.resolve({})
     )
@@ -98,8 +112,8 @@ export function LoginPage() {
     return () => {
       live = false;
     };
-  }, [requestId]);
-  if (session && !requestId)
+  }, [requestId, requestType, request.invalid]);
+  if (session && !requestId && !request.invalid)
     return (
       <Navigate
         to={session.user.mustChangePassword ? "/change-password" : "/"}
@@ -107,12 +121,17 @@ export function LoginPage() {
       />
     );
   const submit = async (values: { username: string; password: string }) => {
+    if (request.invalid) {
+      setError("INVALID_TRANSACTION");
+      return;
+    }
     setBusy(true);
     setError("");
     try {
       const value = await write<LoginState>("/auth/login", {
         ...values,
         requestId,
+        requestType,
       });
       continueLogin(value);
     } catch (e) {
@@ -180,6 +199,7 @@ export function PasswordForm({ required = false }: { required?: boolean }) {
         {
           ...values,
           requestId: query.get("requestId") || "",
+          requestType: query.get("requestType") || "oidc",
         },
       );
       resetCSRF();
@@ -296,8 +316,9 @@ export function MFAPage() {
       await write("/auth/login/cancel", {});
       window.location.assign(
         "/login" +
-          (state?.requestId
-            ? "?requestId=" + encodeURIComponent(state.requestId)
+          (state?.requestId && state.requestType !== "saml"
+            ? "?requestType=oidc&requestId=" +
+              encodeURIComponent(state.requestId)
             : ""),
       );
     } catch (e) {

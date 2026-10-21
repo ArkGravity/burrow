@@ -70,7 +70,7 @@ func (b *Server) list(w http.ResponseWriter, r *http.Request, resource string) {
 		}
 		if len(ids) > 0 {
 			var apps []ApplicationRef
-			if err := b.DB.Model(&Application{}).Select("id", "name", "client_id").Where("id IN ?", ids).Scan(&apps).Error; err != nil {
+			if err := b.DB.Model(&Application{}).Select("applications.id, applications.name, applications.protocol, CASE WHEN applications.protocol = 'oidc' THEN applications.client_id ELSE '' END AS client_id, saml_applications.entity_id AS saml_entity_id").Joins("LEFT JOIN saml_applications ON saml_applications.application_id = applications.id").Where("applications.id IN ?", ids).Scan(&apps).Error; err != nil {
 				fail(w, r, 503, "unavailable")
 				return
 			}
@@ -104,8 +104,24 @@ func (b *Server) list(w http.ResponseWriter, r *http.Request, resource string) {
 			b.DB.Model(&RolePermission{}).Where("role_id = ?", v.ID).Pluck("permission_id", &v.PermissionIDs)
 		}
 	case *[]Application:
+		var configs []SAMLApplication
+		ids := make([]string, len(*values))
+		for i := range *values {
+			ids[i] = (*values)[i].ID
+		}
+		if len(ids) > 0 {
+			if err := b.DB.Where("application_id IN ?", ids).Find(&configs).Error; err != nil {
+				fail(w, r, 503, "unavailable")
+				return
+			}
+		}
+		byID := map[string]*SAMLApplication{}
+		for i := range configs {
+			byID[configs[i].ApplicationID] = &configs[i]
+		}
 		for i := range *values {
 			b.hydrateApp(b.DB, &(*values)[i])
+			(*values)[i].SAML = byID[(*values)[i].ID]
 		}
 	}
 	write(w, 200, map[string]any{"items": out, "total": total, "page": p, "pageSize": n})
@@ -214,7 +230,7 @@ func (b *Server) mutate(w http.ResponseWriter, r *http.Request, resource string)
 		"users":        {"username", "name", "email", "enabled", "mustChangePassword", "language", "theme", "password", "roleIds", "groupIds"},
 		"groups":       {"name", "description", "userIds", "roleIds"},
 		"roles":        {"name", "description", "permissionIds"},
-		"applications": {"name", "clientId", "clientSecret", "clientType", "enabled", "icon", "loginUrl", "redirectUris", "postLogoutRedirectUris", "origins", "allowWithoutPkce", "roleIds"},
+		"applications": {"name", "protocol", "saml", "clientId", "clientSecret", "clientType", "enabled", "icon", "loginUrl", "redirectUris", "postLogoutRedirectUris", "origins", "allowWithoutPkce", "roleIds"},
 	}
 	for k := range in {
 		if !contains(allowed[resource], k) {
@@ -234,6 +250,14 @@ func (b *Server) mutate(w http.ResponseWriter, r *http.Request, resource string)
 		}
 	}
 	var result any
+	var samlInput *SAMLApplication
+	if resource == "applications" {
+		samlInput, e = b.samlApplicationInput(in)
+		if e != nil {
+			fail(w, r, 400, "invalid_request")
+			return
+		}
+	}
 	auditDetails := ""
 	secret := ""
 	b.mu.Lock()
@@ -317,7 +341,7 @@ func (b *Server) mutate(w http.ResponseWriter, r *http.Request, resource string)
 				if err := tx.Model(&User{}).Where("id = ?", id).Update("auth_version", gorm.Expr("auth_version + 1")).Error; err != nil {
 					return err
 				}
-				if err := invalidateAuthentication(tx, id, "", ""); err != nil {
+				if err := invalidateAuthentication(tx, id, "", LoginRequestRef{}); err != nil {
 					return err
 				}
 			}
@@ -369,11 +393,31 @@ func (b *Server) mutate(w http.ResponseWriter, r *http.Request, resource string)
 			}
 			result = v
 		case "applications":
-			v := Application{ID: id, ClientID: random(18), ClientType: "web", Enabled: true, RedirectURLs: []string{}, LogoutURLs: []string{}, Origins: []string{}}
+			v := Application{ID: id, Protocol: "oidc", ClientID: random(18), ClientType: "web", Enabled: true, RedirectURLs: []string{}, LogoutURLs: []string{}, Origins: []string{}}
 			if !creating {
 				if err := tx.First(&v, "id = ?", id).Error; err != nil {
 					return err
 				}
+			}
+			protocol := v.Protocol
+			if raw, present := in["protocol"]; present {
+				if string(raw) == "null" || json.Unmarshal(raw, &protocol) != nil || !contains([]string{"oidc", "saml"}, protocol) {
+					return invalid("request")
+				}
+			}
+			if !creating && protocol != v.Protocol {
+				return invalid("request")
+			}
+			v.Protocol = protocol
+			if protocol == "saml" {
+				if err := b.saveSAMLApplication(tx, &v, in, samlInput, creating, admin); err != nil {
+					return err
+				}
+				result = v
+				break
+			}
+			if _, present := in["saml"]; present {
+				return invalid("request")
 			}
 			oldClient := v.ClientID
 			oldType := v.ClientType
@@ -698,6 +742,9 @@ func (b *Server) deleteResource(tx *gorm.DB, resource, id string, admin, canAuth
 		if contains(ids, "admin") && !admin {
 			return errors.New("forbidden")
 		}
+		if e := invalidateAuthentication(tx, id, "", LoginRequestRef{}); e != nil {
+			return e
+		}
 		for _, m := range []any{&UserRole{}, &GroupMember{}, &LoginTransaction{}} {
 			if e := tx.Where("user_id = ?", id).Delete(m).Error; e != nil {
 				return e
@@ -762,7 +809,7 @@ func (b *Server) resetPassword(w http.ResponseWriter, r *http.Request) {
 		if e := tx.Model(&User{}).Where("id = ?", id).Updates(map[string]any{"password_hash": h, "must_change_password": true, "auth_version": gorm.Expr("auth_version + 1")}).Error; e != nil {
 			return e
 		}
-		return invalidateAuthentication(tx, id, "", "")
+		return invalidateAuthentication(tx, id, "", LoginRequestRef{})
 	})
 	if e != nil {
 		mutationError(w, r, e)
@@ -782,7 +829,7 @@ func (b *Server) resetSecret(w http.ResponseWriter, r *http.Request) {
 		if e := tx.First(&app, "id = ?", id).Error; e != nil {
 			return e
 		}
-		if app.ClientType != "web" {
+		if app.Protocol != "oidc" || app.ClientType != "web" {
 			return invalid("application")
 		}
 		return tx.Model(&app).Update("secret_hash", hash(secret)).Error

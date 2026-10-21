@@ -107,13 +107,21 @@ func (b *Server) loginStateDB(tx *gorm.DB, r *http.Request) (User, LoginTransact
 	return u, l, nil
 }
 func (b *Server) validateLoginRequest(tx *gorm.DB, u User, l LoginTransaction) error {
+	ref, err := normalizeLoginRequest(l.RequestType, l.RequestID)
+	if err != nil {
+		return err
+	}
+	if ref.Type == "saml" {
+		_, _, _, err := b.samlTransactionDB(tx, ref.ID, l.BrowserHash, time.Now())
+		return err
+	}
 	if l.RequestID != "" {
 		var a AuthTransaction
 		if tx.Where("id = ? AND browser_hash = ? AND expires_at > ? AND consumed = ?", l.RequestID, l.BrowserHash, time.Now(), false).First(&a).Error != nil {
 			return errors.New("invalid_transaction")
 		}
 		var app Application
-		if tx.Where("id = ? AND enabled = ?", a.ClientID, true).First(&app).Error != nil {
+		if tx.Where("id = ? AND enabled = ? AND protocol = ?", a.ClientID, true, "oidc").First(&app).Error != nil {
 			return errors.New("invalid_transaction")
 		}
 		// Recheck the application's current permission before completing authentication.
@@ -128,15 +136,20 @@ func (b *Server) validateLoginRequest(tx *gorm.DB, u User, l LoginTransaction) e
 	return nil
 }
 func (b *Server) loginResult(u User, l LoginTransaction) map[string]any {
-	return map[string]any{"step": b.loginStep(u, l), "expiresAt": l.ExpiresAt, "requestId": l.RequestID}
+	return map[string]any{"step": b.loginStep(u, l), "expiresAt": l.ExpiresAt, "requestId": l.RequestID, "requestType": l.RequestType}
 }
 func (b *Server) login(w http.ResponseWriter, r *http.Request) {
 	if b.limited(r, "login") {
 		fail(w, r, 429, "rate_limited")
 		return
 	}
-	var in struct{ Username, Password, RequestID string }
+	var in struct{ Username, Password, RequestID, RequestType string }
 	if !decode(w, r, &in) {
+		return
+	}
+	ref, refErr := normalizeLoginRequest(in.RequestType, in.RequestID)
+	if refErr != nil {
+		mutationError(w, r, refErr)
 		return
 	}
 	if b.limitedKey("login-account:"+hash(in.Username), 30) {
@@ -161,7 +174,7 @@ func (b *Server) login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	credential := random(32)
-	l := LoginTransaction{ID: random(18), CredentialHash: hash(credential), BrowserHash: hash(browser.Value), UserID: u.ID, AuthVersion: u.AuthVersion, RequestID: in.RequestID, ExpiresAt: time.Now().Add(restrictedLoginTTL)}
+	l := LoginTransaction{ID: random(18), CredentialHash: hash(credential), BrowserHash: hash(browser.Value), UserID: u.ID, AuthVersion: u.AuthVersion, RequestID: ref.ID, RequestType: ref.Type, ExpiresAt: time.Now().Add(restrictedLoginTTL)}
 	var out map[string]any
 	var sessionCredential string
 	err = b.authenticationTx(func(tx *gorm.DB) error {
@@ -351,9 +364,22 @@ func (b *Server) finishLogin(tx *gorm.DB, u User, l LoginTransaction, r *http.Re
 		return b.loginResult(u, l), "", nil
 	}
 	credential := random(32)
-	session := Session{ID: random(18), UserID: u.ID, CredentialHash: hash(credential), Method: "password", AuthTime: time.Now(), MFAAt: l.MFAAt, AuthVersion: u.AuthVersion, ExpiresAt: time.Now().Add(b.Config.SessionTTL)}
+	now := time.Now().UTC()
+	session := Session{ID: random(18), UserID: u.ID, CredentialHash: hash(credential), Method: "password", AuthTime: now, MFAAt: l.MFAAt, AuthVersion: u.AuthVersion, ExpiresAt: now.Add(b.Config.SessionTTL), UTCTimestamps: true}
 	if err := tx.Create(&session).Error; err != nil {
 		return nil, "", err
+	}
+	if l.RequestType == "saml" {
+		if err := b.validateLoginRequest(tx, u, l); err != nil {
+			return nil, "", err
+		}
+		q := tx.Model(&SAMLTransaction{}).Where("id = ? AND browser_hash = ? AND consumed = ? AND expires_at > ?", l.RequestID, l.BrowserHash, false, time.Now().UTC()).Updates(map[string]any{"session_id": session.ID, "user_id": u.ID})
+		if q.Error != nil {
+			return nil, "", q.Error
+		}
+		if q.RowsAffected != 1 {
+			return nil, "", errors.New("invalid_transaction")
+		}
 	}
 	if err := tx.Delete(&l).Error; err != nil {
 		return nil, "", err
@@ -361,10 +387,11 @@ func (b *Server) finishLogin(tx *gorm.DB, u User, l LoginTransaction, r *http.Re
 	if err := tx.Create(&Event{ID: random(18), ActorID: u.ID, ObjectID: u.ID, Kind: "login", Success: true, RequestID: requestID(r), CreatedAt: time.Now()}).Error; err != nil {
 		return nil, "", err
 	}
-	out := map[string]any{"step": "complete", "redirect": "/"}
-	if l.RequestID != "" {
-		out["redirect"] = "/oidc/login?requestId=" + url.QueryEscape(l.RequestID)
+	target, err := loginRequestURL(LoginRequestRef{Type: l.RequestType, ID: l.RequestID})
+	if err != nil {
+		return nil, "", err
 	}
+	out := map[string]any{"step": "complete", "redirect": target, "requestId": l.RequestID, "requestType": l.RequestType}
 	return out, credential, nil
 }
 func (b *Server) loginResponse(w http.ResponseWriter, out map[string]any, credential string) {
@@ -407,7 +434,7 @@ func (b *Server) loginPassword(w http.ResponseWriter, r *http.Request) {
 		if b.loginStep(u, l) != "password" {
 			return errors.New("invalid_step")
 		}
-		if err := invalidateAuthentication(tx, u.ID, l.ID, l.RequestID); err != nil {
+		if err := invalidateAuthentication(tx, u.ID, l.ID, LoginRequestRef{Type: l.RequestType, ID: l.RequestID}); err != nil {
 			return err
 		}
 		u.PasswordHash, u.MustChangePassword, u.AuthVersion = h, false, u.AuthVersion+1
@@ -437,7 +464,20 @@ func (b *Server) loginPassword(w http.ResponseWriter, r *http.Request) {
 }
 func (b *Server) cancelLogin(r *http.Request) error {
 	if c, err := r.Cookie("burrow_login"); err == nil {
-		return b.DB.Where("credential_hash = ?", hash(c.Value)).Delete(&LoginTransaction{}).Error
+		return b.authenticationTx(func(tx *gorm.DB) error {
+			var l LoginTransaction
+			if err := tx.Where("credential_hash = ?", hash(c.Value)).First(&l).Error; errors.Is(err, gorm.ErrRecordNotFound) {
+				return nil
+			} else if err != nil {
+				return err
+			}
+			if l.RequestType == "saml" {
+				if err := tx.Where("id = ? AND browser_hash = ?", l.RequestID, l.BrowserHash).Delete(&SAMLTransaction{}).Error; err != nil {
+					return err
+				}
+			}
+			return tx.Delete(&l).Error
+		})
 	}
 	return nil
 }
@@ -451,16 +491,26 @@ func (b *Server) loginCancel(w http.ResponseWriter, r *http.Request) {
 }
 
 // Keep only the transaction performing a forced password change, and its RP request.
-func invalidateAuthentication(tx *gorm.DB, id, keepLogin, keepRequest string) error {
+func invalidateAuthentication(tx *gorm.DB, id, keepLogin string, keepRequest LoginRequestRef) error {
 	if err := tx.Model(&Session{}).Where("user_id = ?", id).Update("revoked", true).Error; err != nil {
 		return err
 	}
 	if err := tx.Model(&TokenRecord{}).Where("user_id = ?", id).Update("revoked", true).Error; err != nil {
 		return err
 	}
-	pending := tx.Model(&LoginTransaction{}).Select("request_id").Where("user_id = ? AND id <> ? AND request_id <> ?", id, keepLogin, keepRequest)
-	if err := tx.Where("id <> ? AND (user_id = ? OR id IN (?))", keepRequest, id, pending).Delete(&AuthTransaction{}).Error; err != nil {
-		return err
+	for _, kind := range []string{"oidc", "saml"} {
+		keep := ""
+		if kind == keepRequest.Type || (keepRequest.Type == "" && kind == "oidc") {
+			keep = keepRequest.ID
+		}
+		pending := tx.Model(&LoginTransaction{}).Select("request_id").Where("user_id = ? AND id <> ? AND request_type = ?", id, keepLogin, kind)
+		var model any = &AuthTransaction{}
+		if kind == "saml" {
+			model = &SAMLTransaction{}
+		}
+		if err := tx.Where("id <> ? AND (user_id = ? OR id IN (?))", keep, id, pending).Delete(model).Error; err != nil {
+			return err
+		}
 	}
 	return tx.Where("user_id = ? AND id <> ?", id, keepLogin).Delete(&LoginTransaction{}).Error
 }
@@ -468,7 +518,7 @@ func (s *Store) resetMFATx(tx *gorm.DB, target User, actor, reason, request stri
 	if err := tx.Model(&User{}).Where("id = ?", target.ID).Updates(map[string]any{"mfa_enabled": false, "mfa_cipher": "", "mfa_last_step": -1, "auth_version": gorm.Expr("auth_version + 1")}).Error; err != nil {
 		return err
 	}
-	if err := invalidateAuthentication(tx, target.ID, "", ""); err != nil {
+	if err := invalidateAuthentication(tx, target.ID, "", LoginRequestRef{}); err != nil {
 		return err
 	}
 	details, _ := json.Marshal(map[string]string{"reason": reason})

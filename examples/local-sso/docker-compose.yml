@@ -130,14 +130,41 @@ services:
           - grafana.yakir.top
           - n9e.yakir.top
           - harbor.yakir.top
+          - jenkins.yakir.top
     restart: unless-stopped
     healthcheck:
       test: [CMD, wget, -q, -O, /dev/null, http://127.0.0.1/nginx-health]
       interval: 5s
       timeout: 3s
       retries: 10
+  jenkins:
+    profiles: [jenkins]
+    image: burrow-jenkins:local-sso
+    build:
+      context: ./jenkins
+    volumes:
+      - jenkins-data:/var/jenkins_home
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test:
+        [
+          CMD,
+          curl,
+          --fail,
+          --silent,
+          --output,
+          /dev/null,
+          http://127.0.0.1:8080/login,
+        ]
+      interval: 10s
+      timeout: 5s
+      start_period: 60s
+      retries: 20
 
 volumes:
   burrow-data:
   grafana-data:
   nightingale-data:
+  jenkins-data:

@@ -42,10 +42,14 @@ func run() error {
 	}
 	fs := flag.NewFlagSet(command, flag.ContinueOnError)
 	configPath := fs.String("config", "", "configuration file (default: configs/config.yaml or embedded defaults)")
-	var username, reason *string
+	var username, reason, protocol *string
 	if command == "mfa-reset" {
 		username = fs.String("username", "", "account to reset")
 		reason = fs.String("reason", "", "required audit reason")
+	}
+	if command == "keys-rotate" {
+		protocol = fs.String("protocol", "oidc", "signing protocol: oidc or saml")
+		reason = fs.String("reason", "", "required audit reason for SAML rotation")
 	}
 	if err := fs.Parse(args); err != nil {
 		if err == flag.ErrHelp {
@@ -55,6 +59,14 @@ func run() error {
 	}
 	if fs.NArg() != 0 {
 		return fmt.Errorf("unexpected arguments: %s", strings.Join(fs.Args(), " "))
+	}
+	if command == "keys-rotate" {
+		if *protocol != "oidc" && *protocol != "saml" {
+			return fmt.Errorf("invalid_protocol")
+		}
+		if *protocol == "saml" && strings.TrimSpace(*reason) == "" {
+			return fmt.Errorf("invalid_reason")
+		}
 	}
 	if command == "version" {
 		fmt.Printf("burrow %s\ncommit: %s\nbuilt: %s\n", version, commit, buildTime)
@@ -109,9 +121,11 @@ func run() error {
 			return e
 		}
 		if n == 0 {
-			return store.RotateKeys()
+			if e = store.RotateKeys(); e != nil {
+				return e
+			}
 		}
-		return nil
+		return store.EnsureSAMLSigningKey()
 	case "seed":
 		if e := store.Seed(c.Bootstrap); e != nil {
 			return e
@@ -128,8 +142,11 @@ func run() error {
 		slog.Info("MFA reset completed; next password login requires enrollment")
 		return nil
 	case "keys-rotate":
-		if e = store.Health(context.Background()); e != nil {
+		if e = store.SchemaHealth(context.Background()); e != nil {
 			return e
+		}
+		if *protocol == "saml" {
+			return store.RotateSAMLKeys(*reason)
 		}
 		return store.RotateKeys()
 	case "serve":

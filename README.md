@@ -9,7 +9,7 @@
 
 English · [简体中文](README_zh.md)
 
-A lightweight OpenID Connect identity provider for small teams and self-hosted
+A lightweight OpenID Connect and SAML identity provider for small teams and self-hosted
 services. Burrow centralizes accounts, shared SSO and application access in a
 single-organization, single-instance service. Its Go backend and React UI ship
 as one binary, or run with PostgreSQL through Docker Compose.
@@ -21,15 +21,17 @@ as one binary, or run with PostgreSQL through Docker Compose.
 ## Features and scope
 
 - **Shared SSO:** connect Web and SPA applications through OIDC Authorization Code, with PKCE S256 required by default.
+- **SAML IdP:** signed SP-initiated Redirect requests and double-signed POST responses, with a manually configured [Jenkins example](examples/local-sso/jenkins/README.md).
 - **Password authentication:** temporary-password changes and optional TOTP MFA; MFA is disabled by default and applies to all accounts when enabled.
 - **Access management:** users, groups, custom roles, permissions, audited changes and a portal of authorized applications.
 - **Localized UI:** English and Simplified Chinese, with light, dark and system themes.
 - **Simple deployment:** one binary with an embedded UI; PostgreSQL in production and SQLite for development and tests, without Redis or a queue.
 
 Inspired by Casdoor and independently implemented, Burrow focuses on password
-login and downstream OIDC. Upstream identity federation, Refresh Tokens and
+login, downstream OIDC and the agreed SAML subset. Upstream identity federation, Refresh Tokens and
 cross-application logout are outside its current scope. Applications manage their
 own sessions and business permissions; see [protocol boundaries](docs/development/oidc-adapter.md).
+SAML scope and current interoperability evidence are documented [separately](docs/testing/saml-jenkins.md).
 
 ## Screenshots
 

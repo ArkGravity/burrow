@@ -14,6 +14,7 @@ COMPOSE_PROFILES ?= local-db
 COMPOSE = docker compose --env-file "$(COMPOSE_ENV)" --project-name "$(COMPOSE_PROJECT)" $(foreach profile,$(COMPOSE_PROFILES),--profile $(profile))
 
 .PHONY: help deps run migrate seed keys-rotate build test test-db test-e2e lint fmt check web-install web web-dev web-check examples-install browser-install compose-config compose-build compose-up compose-down compose-logs compose-seed
+.PHONY: test-e2e-jenkins
 
 help: ## Show available commands
 	@awk 'BEGIN {FS = ":.*## "; printf "Burrow development commands\n\n"} /^[a-zA-Z_-]+:.*## / {printf "  %-19s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -46,6 +47,9 @@ test-db: ## Require BURROW_TEST_POSTGRES_DSN and run the Go suite
 
 test-e2e: examples-install ## Run Chromium tests and independent OIDC clients
 	sh web/e2e/run.sh
+
+test-e2e-jenkins: ## Opt-in isolated Burrow/Jenkins SAML interoperability (Docker)
+	sh web/e2e/run-jenkins-saml.sh
 
 lint: ## Run Go static analysis
 	$(GO) vet ./...
