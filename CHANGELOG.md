@@ -1,6 +1,8 @@
 # Changelog
 
-## v1.0.0 (release preparation)
+## v1.0.0 (2026-10-21)
+
+Published as [Burrow v1.0.0](https://github.com/ArkGravity/burrow/releases/tag/v1.0.0).
 
 - Add the downstream SAML 2.0 IdP alongside OIDC: signed SP-initiated Redirect
   requests, double-signed POST responses, persistent NameID, current-access
