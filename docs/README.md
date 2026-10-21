@@ -11,6 +11,7 @@ A [Simplified Chinese introduction and setup guide](../README_zh.md) is also ava
 - [Local development, builds and checks](development/getting-started.md)
 - [Contributing](../CONTRIBUTING.md)
 - [Private vulnerability reporting](../SECURITY.md)
+- [v1.0.0 release notes and upgrade requirements](releases/v1.0.0.md)
 - [Independent Web and SPA clients](../examples/README.md)
 
 ## Development
@@ -33,7 +34,7 @@ A [Simplified Chinese introduction and setup guide](../README_zh.md) is also ava
 - [Grafana OIDC integration and acceptance](operations/grafana.md)
 - [Jenkins SAML configuration and recovery](operations/jenkins.md)
 - [SAML and Jenkins verification evidence](testing/saml-jenkins.md)
-- [Local Docker Burrow, Grafana, Nightingale, Harbor and Nginx example](../examples/local-sso/README.md)
+- [Local Docker Burrow, Grafana, Nightingale, Harbor, Jenkins and Nginx example](../examples/local-sso/README.md)
 - [Protocol interoperability and regression verification](testing/oidc-conformance.md)
 - [CI workflow](../.github/workflows/ci.yml)
 

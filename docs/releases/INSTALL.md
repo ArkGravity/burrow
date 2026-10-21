@@ -100,8 +100,15 @@ requiring MFA, explicitly set `BURROW_MFA_ENABLED=true` in the service environme
 starting the upgraded server. Existing authenticator bindings are preserved.
 Stop the old server, select the new image/binary, run migration and seed, then
 start the new server. Never generate a replacement master key for an existing
-database. Keep the old backup until administrator and downstream OIDC login
+database. Keep the old backup until administrator and configured downstream OIDC/SAML login
 have been verified.
+
+This release uses schema v6. Upgrading from v0.1.x applies migration 006 while
+preserving existing OIDC users, applications, credentials, grants, sessions and
+keys. Migration explicitly initializes independent encrypted SAML signing keys;
+the server does not generate or silently replace them. SAML may require an older
+session to authenticate again. Run only one version against the database, and
+restore the pre-upgrade backup to roll back to a binary that requires schema v5.
 
 Upgrading older development versions to schema v5 invalidates old Burrow
 sessions/tokens and unfinished authorizations. Users sign in again with their
@@ -115,10 +122,10 @@ and [backup, upgrade and MFA recovery guide](https://github.com/ArkGravity/burro
 
 ## License and verification scope
 
-Burrow is released under the included MIT license. These are early releases;
-future releases may require configuration, API or database migrations. Automated
-OIDC interoperability checks and historical manual acceptance do not constitute
-OpenID Foundation certification or validation of your production deployment.
+Burrow is released under the included MIT license. Read the selected release's
+notes for configuration, API and database upgrade requirements. Automated OIDC/SAML
+interoperability checks and historical manual acceptance do not constitute
+official protocol certification or validation of your production deployment.
 Report suspected vulnerabilities through
 [GitHub private vulnerability reporting](https://github.com/ArkGravity/burrow/security/advisories/new);
 see the [security policy](https://github.com/ArkGravity/burrow/blob/@VERSION@/SECURITY.md).

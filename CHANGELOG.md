@@ -1,5 +1,27 @@
 # Changelog
 
+## v1.0.0 (release preparation)
+
+- Add the downstream SAML 2.0 IdP alongside OIDC: signed SP-initiated Redirect
+  requests, double-signed POST responses, persistent NameID, current-access
+  revalidation and one-time request/replay protection.
+- Add schema v6 and independent encrypted SAML signing keys with audited rotation;
+  preserve existing OIDC data and migration checksums. Upgrade requires migration
+  before startup and retaining the original database/master key.
+- Add manual Jenkins SAML integration and isolated real-SP regression coverage.
+  The maintainer reported successful local Grafana/Nightingale OIDC and Jenkins
+  SAML integration; this is separate from CI and production validation.
+- Group portal applications by OIDC/SAML, compact management tables and navigation,
+  improve mobile tooltips/logout access, and refresh screenshots and both READMEs.
+- Fix image publication config-digest validation for Docker's containerd store;
+  preserve anonymous access and matching dual-architecture digests across registries.
+- Align installation examples and the UI version with v1.0.0; use a normal
+  preparation PR followed by a verified main tag without a required release branch.
+
+See [v1.0.0 release notes](docs/releases/v1.0.0.md). MFA remains disabled by default.
+SAML encryption, SLO, IdP-initiated login, upstream federation and SCIM remain
+outside scope; the major version does not add protocol certification claims.
+
 ## v0.1.4 (2026-10-12)
 
 Published as [Burrow v0.1.4](https://github.com/ArkGravity/burrow/releases/tag/v0.1.4).

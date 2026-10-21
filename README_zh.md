@@ -58,7 +58,7 @@ SAML 的边界和实际互操作状态见[独立验证记录](docs/testing/saml-
 再从 [Releases](https://github.com/ArkGravity/burrow/releases) 下载部署包。以下示例固定版本：
 
 ```bash
-BURROW_RELEASE=v0.1.4
+BURROW_RELEASE=v1.0.0
 tar -xzf "burrow_${BURROW_RELEASE}_deploy.tar.gz"
 cd "burrow_${BURROW_RELEASE}_deploy"
 cp .env.example .env
