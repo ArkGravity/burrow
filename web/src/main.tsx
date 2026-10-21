@@ -16,6 +16,7 @@ import {
   ConfigProvider,
   Result,
   Spin,
+  Tooltip,
   theme,
 } from "antd";
 import enUS from "antd/locale/en_US";
@@ -75,6 +76,15 @@ function Shell() {
   const location = useLocation();
   const { message } = AntApp.useApp();
   const [signingOut, setSigningOut] = useState(false);
+  const [compactNavigation, setCompactNavigation] = useState(
+    () => window.matchMedia("(max-width: 760px)").matches,
+  );
+  useEffect(() => {
+    const media = window.matchMedia("(max-width: 760px)");
+    const change = () => setCompactNavigation(media.matches);
+    media.addEventListener("change", change);
+    return () => media.removeEventListener("change", change);
+  }, []);
   const signOut = async () => {
     setSigningOut(true);
     try {
@@ -90,16 +100,13 @@ function Shell() {
   if (session.user.mustChangePassword)
     return <Navigate to="/change-password" replace />;
   const active = navigation.find((x) => x.path === location.pathname);
+  const displayName = session.user.name || session.user.username;
   return (
     <div className="workspace">
       <aside className="sidebar">
         <NavLink to="/" className="workspace-label" aria-label="Burrow">
           <BrandMark />
-          <div>
-            <strong>Burrow</strong>
-            <small>{t("admin")}</small>
-          </div>
-          <span className="status-dot" />
+          <strong>Burrow</strong>
         </NavLink>
         <nav>
           {(["workspace", "identity", "connections"] as const).map((group) => {
@@ -113,21 +120,25 @@ function Shell() {
                 <div className="nav-group" key={group}>
                   <div className="nav-label">{t(group)}</div>
                   {items.map((item) => (
-                    <NavLink
-                      aria-label={t(item.key)}
+                    <Tooltip
                       key={item.key}
-                      end
-                      to={item.path}
-                      className={({ isActive }) =>
-                        "nav-item" + (isActive ? " active" : "")
-                      }
+                      title={t(item.key)}
+                      placement="right"
+                      trigger={["hover", "focus"]}
+                      open={compactNavigation ? undefined : false}
                     >
-                      {item.icon}
-                      <span>{t(item.key)}</span>
-                      {item.key === "home" && (
-                        <span className="nav-indicator" />
-                      )}
-                    </NavLink>
+                      <NavLink
+                        aria-label={t(item.key)}
+                        end
+                        to={item.path}
+                        className={({ isActive }) =>
+                          "nav-item" + (isActive ? " active" : "")
+                        }
+                      >
+                        {item.icon}
+                        <span>{t(item.key)}</span>
+                      </NavLink>
+                    </Tooltip>
                   ))}
                 </div>
               )
@@ -135,30 +146,42 @@ function Shell() {
           })}
         </nav>
         <div className="sidebar-bottom">
-          <NavLink to="/profile" className="user-block">
-            <Avatar style={{ background: "#dbe8db", color: "#2a4c42" }}>
-              {(session.user.name || session.user.username)
-                .slice(0, 1)
-                .toUpperCase()}
-            </Avatar>
-            <div>
-              <strong>{session.user.name || session.user.username}</strong>
-              <small>{t("profile")}</small>
-            </div>
-          </NavLink>
-          <Button
-            type="text"
-            aria-label={t("signOut")}
-            icon={<LogoutOutlined />}
-            loading={signingOut}
-            onClick={() => void signOut()}
-          />
+          <Tooltip
+            title={`${displayName} · ${t("profile")}`}
+            placement={compactNavigation ? "right" : "topLeft"}
+            trigger={["hover", "focus"]}
+          >
+            <NavLink to="/profile" className="user-block">
+              <Avatar style={{ background: "#dbe8db", color: "#2a4c42" }}>
+                {displayName.slice(0, 1).toUpperCase()}
+              </Avatar>
+              <div>
+                <strong>{displayName}</strong>
+                <small>{t("profile")}</small>
+              </div>
+            </NavLink>
+          </Tooltip>
+          <Tooltip
+            title={t("signOut")}
+            placement="right"
+            trigger={["hover", "focus"]}
+          >
+            <Button
+              type="text"
+              aria-label={t("signOut")}
+              icon={<LogoutOutlined />}
+              loading={signingOut}
+              onClick={() => void signOut()}
+            />
+          </Tooltip>
         </div>
       </aside>
       <div className="main-workspace">
         <header className="topbar">
           <span className="breadcrumb">
-            Burrow <span>/</span> <strong>{t(active?.key || "profile")}</strong>
+            <span className="breadcrumb-root">Burrow</span>
+            <span className="breadcrumb-separator">/</span>
+            <strong>{t(active?.key || "profile")}</strong>
           </span>
           <Preferences />
         </header>
@@ -269,8 +292,13 @@ function Root() {
                 borderRadius: 8,
                 fontFamily:
                   'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-                controlHeight: 38,
+                controlHeight: 34,
                 colorBgLayout: dark ? "#101917" : "#f7f8f5",
+                colorBgContainer: dark ? "#18231f" : "#ffffff",
+                colorBorder: dark ? "#2b3a32" : "#e5e9e2",
+                colorBorderSecondary: dark ? "#2b3a32" : "#e5e9e2",
+                colorText: dark ? "#e2e9e1" : "#24392f",
+                colorTextSecondary: dark ? "#91a399" : "#7c8780",
               },
               components: {
                 Table: { headerBg: dark ? "#1d2925" : "#fafbf8" },

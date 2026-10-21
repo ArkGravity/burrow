@@ -9,7 +9,7 @@
 
 [English](README.md) · 简体中文
 
-**面向小团队和自托管服务的轻量 OpenID Connect 单点登录服务。**
+**面向小团队和自托管服务的轻量 OpenID Connect 与 SAML 单点登录服务。**
 
 Burrow 集中管理账户、共享登录会话和应用访问权限，采用单组织、单实例部署。
 Go 后端与 React 界面打包为一个二进制，也支持通过 Docker Compose 搭配 PostgreSQL 运行。
@@ -34,17 +34,18 @@ SAML 的边界和实际互操作状态见[独立验证记录](docs/testing/saml-
 
 ## 界面预览
 
-个人门户展示当前用户获准访问的服务。
+个人门户按协议展示当前用户获准访问的服务：OIDC 分组包含 Grafana、Nightingale，SAML 分组包含 Jenkins。
 
-![Burrow 应用门户，展示 Grafana 和 Nightingale](docs/screenshots/user-app-overview.jpg)
+![Burrow 应用门户，按 OIDC 和 SAML 分组展示 Grafana、Nightingale 和 Jenkins](docs/screenshots/overview.jpg)
 
 <details>
 <summary>应用、角色、用户组和用户管理</summary>
 
-![创建应用](docs/screenshots/create-application.jpg)
-![配置角色权限](docs/screenshots/create-roles.jpg)
-![创建用户组](docs/screenshots/create-group.jpg)
-![创建用户](docs/screenshots/create-user.jpg)
+![创建 Nightingale OIDC 应用](docs/screenshots/create-application-oidc.jpg)
+![创建 Jenkins SAML 应用](docs/screenshots/create-application-saml.jpg)
+![为三个应用配置角色登录权限](docs/screenshots/create-roles.jpg)
+![创建用户组并分配应用访问角色](docs/screenshots/create-groups.jpg)
+![创建用户并加入用户组](docs/screenshots/create-users.jpg)
 
 </details>
 
@@ -81,15 +82,16 @@ Compose 自动按迁移、初始化、服务启动的顺序执行。
 ## 接入应用
 
 1. 创建用户、用户组和普通角色。
-2. 注册 Web 或 SPA 应用，设置精确的回调地址、登录地址和必要的浏览器来源。
+2. 注册应用时选择 OIDC 或 SAML。OIDC 配置 Web 或 SPA 客户端、精确的回调地址和必要的浏览器来源；SAML 导入服务提供方元数据，并在服务提供方配置信任 Burrow 的 IdP 元数据。设置应用登录地址，供门户跳转使用。
 3. 将 `app:<应用 ID>:login` 权限加入角色，再把角色分配给用户或用户组。
-4. 用户在门户中看到获授权应用，由应用发起 OIDC 授权请求。
+4. 用户在门户中按 OIDC / SAML 分组查看获授权应用，由应用发起相应的认证请求。
 
 Administrator 是唯一内置角色。新用户默认没有角色，登录后即可使用个人资料与门户。
 除管理员外，访问应用需要通过角色明确授权。
 
 接入示例：[独立 Web / SPA 客户端](examples/README.md)、
-[Grafana / Nightingale / Harbor](examples/local-sso/README.md)。
+[Grafana / Nightingale / Harbor](examples/local-sso/README.md)、
+[Jenkins SAML](examples/local-sso/jenkins/README.md)。
 
 ## 开发与贡献
 

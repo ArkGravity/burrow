@@ -35,17 +35,19 @@ SAML scope and current interoperability evidence are documented [separately](doc
 
 ## Screenshots
 
-The application portal shows the services a user is allowed to access.
+The application portal groups authorized services by protocol: Grafana and
+Nightingale under OIDC, and Jenkins under SAML.
 
-![Burrow application portal showing Grafana and Nightingale](docs/screenshots/user-app-overview.jpg)
+![Burrow application portal grouped by OIDC and SAML, showing Grafana, Nightingale and Jenkins](docs/screenshots/overview.jpg)
 
 <details>
 <summary>Application, role, group and user management</summary>
 
-![Create an application](docs/screenshots/create-application.jpg)
-![Configure role permissions](docs/screenshots/create-roles.jpg)
-![Create a group](docs/screenshots/create-group.jpg)
-![Create a user](docs/screenshots/create-user.jpg)
+![Create a Nightingale OIDC application](docs/screenshots/create-application-oidc.jpg)
+![Create a Jenkins SAML application](docs/screenshots/create-application-saml.jpg)
+![Configure login permissions for all three applications](docs/screenshots/create-roles.jpg)
+![Create a group with the application access role](docs/screenshots/create-groups.jpg)
+![Create a user with a group assignment](docs/screenshots/create-users.jpg)
 
 </details>
 
@@ -85,16 +87,17 @@ and seed before the server. For binary installation, MFA and upgrades, follow th
 ## Connect applications
 
 1. Create users, groups and ordinary roles.
-2. Register a Web or SPA application with exact callback URLs, a login URL and any required browser origins.
+2. Choose OIDC or SAML when registering an application. For OIDC, configure a Web or SPA client with exact callback URLs and any required browser origins. For SAML, import the service provider metadata and configure its trust in Burrow's IdP metadata. Set the application's login URL for portal access.
 3. Add its `app:<id>:login` permission to a role and assign the role to users or groups.
-4. Users see authorized applications in their portal; each application starts its own OIDC request.
+4. Users see authorized applications grouped by OIDC or SAML in their portal; each application starts its own authentication request.
 
 Administrator is the only built-in role. New users have no roles by default;
 profiles and the portal only require authentication. Application access requires
 an explicit role grant unless the user is an administrator.
 
 See [Web / SPA examples](examples/README.md) and
-[Grafana / Nightingale / Harbor setup](examples/local-sso/README.md).
+[Grafana / Nightingale / Harbor setup](examples/local-sso/README.md), plus the
+[Jenkins SAML guide](examples/local-sso/jenkins/README.md).
 
 ## Development and contributions
 

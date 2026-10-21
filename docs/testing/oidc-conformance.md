@@ -1,5 +1,11 @@
 # 协议与回归验证记录
 
+## 2026-10-21：三平台接入与 UI 截图更新
+
+- 用户报告按 local-sso 文档成功接入 Grafana、Nightingale（OIDC）和 Jenkins（SAML），随后确认门户、管理页面与侧栏的 UI 优化需求已完成，并手动更新 `docs/screenshots/` 中的截图。
+- 中英文 README 已改用新的协议分组门户、OIDC/SAML 应用创建、角色、用户组和用户创建截图；同步了协议说明、Jenkins 接入入口与[截图来源说明](../screenshots/README.md)。已有历史验收记录保留。
+- 此次文档同步检查格式、本地链接和 `git diff --check`，未重复执行产品测试。用户手工验收与自动化结果分别记录；SAML 工程回归与独立 Jenkins 检查见[专门记录](saml-jenkins.md)，不扩展为生产验证、远程 CI 或官方协议认证。
+
 ## 2026-10-12：v0.1.4 正式发布
 
 - [PR #8](https://github.com/ArkGravity/burrow/pull/8) 经[完整 PR CI](https://github.com/ArkGravity/burrow/actions/runs/38177847419) 通过后 squash 合并到 `f86a9d2e03da2b0c74e74e19071ac6c25195fe94`。原生 amd64/arm64 的 SQLite/PostgreSQL race、浏览器、镜像构建，以及前端与静态检查均通过。

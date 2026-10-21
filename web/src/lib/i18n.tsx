@@ -1,6 +1,9 @@
 import { createContext, useContext } from "react";
 export type Language = "en" | "zh-CN";
 const en = {
+  memberCount: "Members",
+  roleCount: "Roles",
+  permissionCount: "Assigned permissions",
   protocol: "Protocol",
   userId: "User ID",
   oidcProtocol: "OpenID Connect",
@@ -160,6 +163,9 @@ const en = {
 } as const;
 type Key = keyof typeof en;
 const zh: Record<Key, string> = {
+  memberCount: "成员数",
+  roleCount: "角色数",
+  permissionCount: "显式权限数",
   protocol: "协议",
   userId: "用户 ID",
   oidcProtocol: "OpenID Connect",
