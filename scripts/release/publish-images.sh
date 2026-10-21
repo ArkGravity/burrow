@@ -23,11 +23,28 @@ platform_digests=()
 for arch in "${architectures[@]}"; do
   local_image="burrow:$kind-$arch"
   docker load --input "$input/image-$arch.tar"
-  config_id=$(docker image inspect "$local_image" --format '{{json .}}' | \
-    jq -er --arg arch "$arch" --arg commit "$commit" '
+  docker image inspect "$local_image" --format '{{json .}}' | \
+    jq -e --arg arch "$arch" --arg commit "$commit" '
       select(.Os == "linux" and .Architecture == $arch and
-        .Config.Labels["org.opencontainers.image.revision"] == $commit) |
-      .Id | select(test("^sha256:[0-9a-f]{64}$"))')
+        .Config.Labels["org.opencontainers.image.revision"] == $commit)' >/dev/null
+  # Docker's containerd image store can report a manifest/index digest as .Id.
+  # Hash the saved config bytes so this check works with either image store.
+  config_id=$(python3 - "$input/image-$arch.tar" <<'PY'
+import hashlib
+import json
+import sys
+import tarfile
+
+with tarfile.open(sys.argv[1]) as archive:
+    manifest = json.load(archive.extractfile("manifest.json"))
+    if len(manifest) != 1:
+        raise SystemExit("Expected exactly one image in the saved archive")
+    config = archive.extractfile(manifest[0]["Config"])
+    if config is None:
+        raise SystemExit("Missing image configuration in the saved archive")
+    print("sha256:" + hashlib.sha256(config.read()).hexdigest())
+PY
+  )
   config_ids+=("$config_id")
   # Compute the manifest identity from the tested archive before registry writes.
   digest=$(crane digest --tarball "$input/image-$arch.tar")
@@ -45,7 +62,8 @@ for repository in "${registries[@]}"; do
     crane push "$input/image-$arch.tar" "$image"
     # The pushed manifest must reference the exact saved image configuration.
     docker buildx imagetools inspect "$image" --raw | \
-      jq -e --arg config "${config_ids[$i]}" '.config.digest == $config' >/dev/null
+      jq -e --arg config "${config_ids[$i]}" '.config.digest == $config' >/dev/null || \
+      { echo "Registry configuration digest mismatch for $arch ($repository)" >&2; exit 1; }
     digest=$(docker buildx imagetools inspect "$image" --format '{{json .Manifest}}' | \
       jq -er '.digest | select(test("^sha256:[0-9a-f]{64}$"))')
     [[ $digest == "${platform_digests[$i]}" ]] || { echo "Registry digest mismatch for $arch" >&2; exit 1; }
