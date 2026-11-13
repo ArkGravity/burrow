@@ -262,17 +262,23 @@ when using local overrides. Inspect `make help` for available actions.
 
 ## Codex and project memory
 
-- Track project MCP settings in `.codex/config.toml`; keep other `.codex/`
-  local state ignored. Supply `MEM0_API_KEY` and `CONTEXT7_API_KEY` through the
-  environment, never as literal secrets in tracked configuration.
+- Track project MCP and plugin settings in `.codex/config.toml`; keep other
+  `.codex/` local state ignored. Supply `MEM0_API_KEY` through the environment,
+  never as a literal secret in tracked configuration.
+- Enable Context7 through the `context7@context7-marketplace` plugin, matching
+  Optimus. Authenticate through the plugin's OAuth flow, then start a new Codex
+  thread. Do not add a duplicate `[mcp_servers.context7]` entry or configure
+  `CONTEXT7_API_KEY` for this plugin setup. Serena MCP is no longer configured.
 - Mem0's platform Project is `ArkGravity`, shared by the Burrow and Optimus
-  repositories. Distinguish repository memories with `metadata.project`:
+  repositories. Distinguish repository memories with native `app_id`:
   `burrow` for this repository and `optimus` for Optimus. Do not create a separate
-  platform Project or rename these metadata values to `ArkGravity`.
-- Write Burrow memories with `user_id=logic`, `app_id=burrow` and
-  `metadata.project=burrow`. Explicitly filter reads and searches by
-  `user_id=logic` and `metadata.project=burrow`; optionally also filter by
-  `app_id=burrow`. Do not rely on the MCP server's default user scope.
+  platform Project or duplicate repository scope in metadata.
+- Write Burrow memories with top-level `user_id="logic"` and `app_id="burrow"`.
+  Explicitly filter reads and searches by both native fields, combined with
+  `AND`. Do not rely on the MCP server's default user scope.
+- Keep memory metadata empty (`{}`); omit it on new writes. Do not add project-name
+  prefixes to memory text. Before updating a memory by ID, verify its user and
+  application scope; after updating, read back the text, scope and metadata.
 - Recall relevant Burrow memories before substantive project work. Treat current
   source, executable documentation and user instructions as authoritative when
   stored memories disagree. Save durable decisions, conventions and verified
